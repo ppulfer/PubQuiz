@@ -9,6 +9,7 @@ public class PubQuizDbContext(DbContextOptions<PubQuizDbContext> options) : DbCo
     public DbSet<Team> Teams => Set<Team>();
     public DbSet<Question> Questions => Set<Question>();
     public DbSet<Answer> Answers => Set<Answer>();
+    public DbSet<WordleAttempt> WordleAttempts => Set<WordleAttempt>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -35,6 +36,7 @@ public class PubQuizDbContext(DbContextOptions<PubQuizDbContext> options) : DbCo
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Text).HasMaxLength(500);
             entity.Property(e => e.Options).HasColumnType("jsonb");
+            entity.Property(e => e.CorrectAnswer).HasMaxLength(100);
         });
 
         modelBuilder.Entity<Answer>(entity =>
@@ -49,6 +51,19 @@ public class PubQuizDbContext(DbContextOptions<PubQuizDbContext> options) : DbCo
                 .HasForeignKey(e => e.GameId)
                 .OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(e => new { e.GameId, e.TeamId, e.QuestionIndex }).IsUnique();
+            entity.Property(e => e.TextAnswer).HasMaxLength(500);
+        });
+
+        modelBuilder.Entity<WordleAttempt>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.HasOne(e => e.Answer)
+                .WithMany(a => a.WordleAttempts)
+                .HasForeignKey(e => e.AnswerId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.Property(e => e.Guess).HasMaxLength(20);
+            entity.Property(e => e.Result).HasMaxLength(20);
+            entity.HasIndex(e => e.AnswerId);
         });
     }
 }

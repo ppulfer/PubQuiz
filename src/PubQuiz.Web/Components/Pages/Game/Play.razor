@@ -1,10 +1,11 @@
 @page "/game/play/{GameCode}/{TeamId:guid}"
+@using PubQuiz.Web.Components.Game
 @inject GameService GameService
 @inject NavigationManager Navigation
 @implements IAsyncDisposable
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 
-<PageTitle>Playing - PubQuiz</PageTitle>
+<PageTitle>Playing - Pause-Quiz</PageTitle>
 
 <div class="container">
     <div class="row justify-content-center">
@@ -46,9 +47,18 @@
                             </div>
                         }
 
-                        <div class="alert alert-light border fs-5">
-                            Correct answer: <strong>@((char)('A' + _currentQuestion.CorrectOptionIndex)) - @_currentQuestion.Options[_currentQuestion.CorrectOptionIndex]</strong>
-                        </div>
+                        @if (_currentQuestion.Type == QuestionType.MultipleChoice)
+                        {
+                            <div class="alert alert-light border fs-5">
+                                Correct answer: <strong>@((char)('A' + _currentQuestion.CorrectOptionIndex)) - @_currentQuestion.Options[_currentQuestion.CorrectOptionIndex]</strong>
+                            </div>
+                        }
+                        else if (_currentQuestion.Type == QuestionType.OpenEnded || _currentQuestion.Type == QuestionType.Wordle)
+                        {
+                            <div class="alert alert-light border fs-5">
+                                Correct answer: <strong>@_currentQuestion.CorrectAnswer</strong>
+                            </div>
+                        }
 
                         <h4 class="mt-4 mb-3">Leaderboard</h4>
                         <table class="table">
@@ -81,54 +91,52 @@
             {
                 <div class="card shadow mt-4">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <span>Question @(_currentQuestionIndex + 1)</span>
-                        <span class="badge @(_timeRemaining <= 5 ? "bg-danger" : "bg-warning text-dark") fs-4">
-                            @_timeRemaining s
-                        </span>
+                        <span>Question @(_currentQuestionIndex + 1) - @GetQuestionTypeName()</span>
+                        @if (_currentQuestion.Type != QuestionType.Wordle)
+                        {
+                            <span class="badge @(_timeRemaining <= 5 ? "bg-danger" : "bg-warning text-dark") fs-4">
+                                @_timeRemaining s
+                            </span>
+                        }
                     </div>
                     <div class="card-body">
-                        <h3 class="mb-4">@_currentQuestion.Text</h3>
+                        @switch (_currentQuestion.Type)
+                        {
+                            case QuestionType.MultipleChoice:
+                                <MultipleChoiceQuestion
+                                    Question="_currentQuestion"
+                                    TimeRemaining="_timeRemaining"
+                                    HasAnswered="_hasAnswered"
+                                    SelectedOption="_selectedOption"
+                                    OnAnswerSelected="SubmitMultipleChoiceAnswer" />
+                                break;
 
-                        @if (_hasAnswered)
-                        {
-                            <div class="alert alert-info text-center">
-                                Answer submitted! Waiting for results...
-                            </div>
-                            <div class="row">
-                                @for (int i = 0; i < _currentQuestion.Options.Count; i++)
-                                {
-                                    var idx = i;
-                                    <div class="col-6 mb-3">
-                                        <div class="card h-100 @(_selectedOption == idx ? "border-primary bg-primary text-white" : "")">
-                                            <div class="card-body text-center">
-                                                <h5>@((char)('A' + idx))</h5>
-                                                <p class="mb-0">@_currentQuestion.Options[idx]</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                }
-                            </div>
-                        }
-                        else
-                        {
-                            <div class="row">
-                                @for (int i = 0; i < _currentQuestion.Options.Count; i++)
-                                {
-                                    var idx = i;
-                                    <div class="col-6 mb-3">
-                                        <button class="btn btn-outline-primary w-100 h-100 py-4" @onclick="() => SubmitAnswer(idx)" disabled="@(_timeRemaining <= 0)">
-                                            <h4>@((char)('A' + idx))</h4>
-                                            <p class="mb-0">@_currentQuestion.Options[idx]</p>
-                                        </button>
-                                    </div>
-                                }
-                            </div>
+                            case QuestionType.OpenEnded:
+                                <OpenEndedQuestion
+                                    Question="_currentQuestion"
+                                    TimeRemaining="_timeRemaining"
+                                    HasAnswered="_hasAnswered"
+                                    SubmittedAnswer="_textAnswer"
+                                    AnswerStatus="_answerStatus"
+                                    PointsAwarded="_lastAnswer?.PointsAwarded ?? 0"
+                                    OnAnswerSubmitted="SubmitTextAnswer" />
+                                break;
+
+                            case QuestionType.Wordle:
+                                <WordleQuestion
+                                    Question="_currentQuestion"
+                                    Attempts="_wordleAttempts"
+                                    AttemptsUsed="_wordleAttemptsUsed"
+                                    IsSolved="_wordleSolved"
+                                    IsOutOfAttempts="_wordleOutOfAttempts"
+                                    PointsAwarded="_lastAnswer?.PointsAwarded ?? 0"
+                                    OnGuessSubmitted="SubmitWordleGuess" />
+                                break;
                         }
                     </div>
                 </div>
             }
         </div>
-
     </div>
 </div>
 
@@ -148,6 +156,13 @@
     private List<TeamScore> _leaderboard = [];
     private HubConnection? _hubConnection;
     private System.Threading.Timer? _timer;
+
+    private string _textAnswer = string.Empty;
+    private AnswerStatus _answerStatus = AnswerStatus.Pending;
+    private List<WordleAttempt> _wordleAttempts = [];
+    private int _wordleAttemptsUsed;
+    private bool _wordleSolved;
+    private bool _wordleOutOfAttempts;
 
     protected override async Task OnInitializedAsync()
     {
@@ -173,19 +188,42 @@
             _selectedOption = -1;
             _lastAnswer = null;
             _showingResults = false;
+            _textAnswer = string.Empty;
+            _answerStatus = AnswerStatus.Pending;
+            _wordleAttempts = [];
+            _wordleAttemptsUsed = 0;
+            _wordleSolved = false;
+            _wordleOutOfAttempts = false;
 
             _timer?.Dispose();
-            _timer = new System.Threading.Timer(async _ =>
+            if (question.Type != QuestionType.Wordle)
             {
-                _timeRemaining--;
-                if (_timeRemaining <= 0)
+                _timer = new System.Threading.Timer(async _ =>
                 {
-                    _timer?.Dispose();
-                }
-                await InvokeAsync(StateHasChanged);
-            }, null, 1000, 1000);
+                    _timeRemaining--;
+                    if (_timeRemaining <= 0)
+                    {
+                        _timer?.Dispose();
+                    }
+                    await InvokeAsync(StateHasChanged);
+                }, null, 1000, 1000);
+            }
 
             await InvokeAsync(StateHasChanged);
+        });
+
+        _hubConnection.On<Guid, bool, int>("AnswerReviewed", async (teamId, approved, points) =>
+        {
+            if (teamId == TeamId)
+            {
+                _answerStatus = approved ? AnswerStatus.Approved : AnswerStatus.Rejected;
+                if (_lastAnswer != null)
+                {
+                    _lastAnswer.IsCorrect = approved;
+                    _lastAnswer.PointsAwarded = points;
+                }
+                await InvokeAsync(StateHasChanged);
+            }
         });
 
         _hubConnection.On<int, List<TeamScore>>("ShowResults", async (questionIndex, leaderboard) =>
@@ -193,6 +231,7 @@
             _timer?.Dispose();
             _showingResults = true;
             _leaderboard = leaderboard;
+            _lastAnswer = await GameService.GetAnswerAsync(_game!.Id, TeamId, _currentQuestionIndex);
             await InvokeAsync(StateHasChanged);
         });
 
@@ -213,7 +252,22 @@
             _currentQuestion = _questions[_currentQuestionIndex];
             var elapsed = (DateTime.UtcNow - _game.QuestionStartedAt.Value).TotalSeconds;
             _timeRemaining = Math.Max(0, _currentQuestion.TimeLimitSeconds - (int)elapsed);
-            if (_timeRemaining > 0)
+
+            var existingAnswer = await GameService.GetAnswerAsync(_game.Id, TeamId, _currentQuestionIndex);
+            if (existingAnswer != null)
+            {
+                _hasAnswered = true;
+                _lastAnswer = existingAnswer;
+                _selectedOption = existingAnswer.SelectedOptionIndex;
+                _textAnswer = existingAnswer.TextAnswer ?? "";
+                _answerStatus = existingAnswer.Status;
+                _wordleAttempts = existingAnswer.WordleAttempts.OrderBy(a => a.AttemptNumber).ToList();
+                _wordleAttemptsUsed = existingAnswer.AttemptsUsed ?? 0;
+                _wordleSolved = existingAnswer.IsCorrect && _currentQuestion.Type == QuestionType.Wordle;
+                _wordleOutOfAttempts = !_wordleSolved && _wordleAttemptsUsed >= _currentQuestion.MaxAttempts;
+            }
+
+            if (_timeRemaining > 0 && _currentQuestion.Type != QuestionType.Wordle)
             {
                 _timer = new System.Threading.Timer(async _ =>
                 {
@@ -228,7 +282,15 @@
         }
     }
 
-    private async Task SubmitAnswer(int optionIndex)
+    private string GetQuestionTypeName() => _currentQuestion?.Type switch
+    {
+        QuestionType.MultipleChoice => "Multiple Choice",
+        QuestionType.OpenEnded => "Open Answer",
+        QuestionType.Wordle => "Wordle",
+        _ => "Question"
+    };
+
+    private async Task SubmitMultipleChoiceAnswer(int optionIndex)
     {
         if (_hasAnswered || _currentQuestion == null) return;
 
@@ -241,6 +303,53 @@
         {
             await _hubConnection.SendAsync("NotifyAnswerSubmitted", GameCode, TeamId);
         }
+    }
+
+    private async Task SubmitTextAnswer(string answer)
+    {
+        if (_hasAnswered || _currentQuestion == null) return;
+
+        _hasAnswered = true;
+        _textAnswer = answer;
+
+        _lastAnswer = await GameService.SubmitTextAnswerAsync(_game!.Id, TeamId, _currentQuestionIndex, answer, _currentQuestion);
+        _answerStatus = _lastAnswer?.Status ?? AnswerStatus.Rejected;
+
+        if (_hubConnection != null)
+        {
+            var team = _game!.Teams.FirstOrDefault(t => t.Id == TeamId);
+            await _hubConnection.SendAsync("NotifyOpenEndedSubmitted", GameCode, TeamId, team?.Name ?? "Unknown", answer);
+        }
+    }
+
+    private async Task SubmitWordleGuess(string guess)
+    {
+        if (_currentQuestion == null || _wordleSolved || _wordleOutOfAttempts) return;
+
+        var (attempt, solved, outOfAttempts) = await GameService.SubmitWordleGuessAsync(
+            _game!.Id, TeamId, _currentQuestionIndex, guess, _currentQuestion);
+
+        if (attempt != null)
+        {
+            _wordleAttempts.Add(attempt);
+            _wordleAttemptsUsed = attempt.AttemptNumber;
+        }
+
+        _wordleSolved = solved;
+        _wordleOutOfAttempts = outOfAttempts;
+
+        if (solved || outOfAttempts)
+        {
+            _hasAnswered = true;
+            _lastAnswer = await GameService.GetAnswerAsync(_game.Id, TeamId, _currentQuestionIndex);
+        }
+
+        if (_hubConnection != null)
+        {
+            await _hubConnection.SendAsync("NotifyWordleProgress", GameCode, TeamId, _wordleAttemptsUsed, solved, outOfAttempts);
+        }
+
+        StateHasChanged();
     }
 
     public async ValueTask DisposeAsync()

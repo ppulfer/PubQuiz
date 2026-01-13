@@ -1,0 +1,131 @@
+@using PubQuiz.Web.Models
+
+<h3 class="mb-4">@Question.Text</h3>
+<p class="text-muted">Guess the @WordLength-letter word in @Question.MaxAttempts attempts</p>
+
+<div class="wordle-grid mb-4">
+    @for (int row = 0; row < Question.MaxAttempts; row++)
+    {
+        <div class="d-flex justify-content-center gap-1 mb-1">
+            @for (int col = 0; col < WordLength; col++)
+            {
+                var letter = GetLetter(row, col);
+                var colorClass = GetColorClass(row, col);
+                <div class="wordle-cell @colorClass">@letter</div>
+            }
+        </div>
+    }
+</div>
+
+@if (IsSolved)
+{
+    <div class="alert alert-success text-center">
+        Solved in @AttemptsUsed attempt(s)! +@PointsAwarded points
+    </div>
+}
+else if (IsOutOfAttempts)
+{
+    <div class="alert alert-danger text-center">
+        Out of attempts! The word was: <strong>@Question.CorrectAnswer?.ToUpper()</strong>
+    </div>
+}
+else
+{
+    <div class="d-flex justify-content-center gap-2 mb-3">
+        <input type="text" class="form-control text-center text-uppercase" style="max-width: 200px; font-size: 1.5rem; letter-spacing: 0.5rem;"
+               @bind="_currentGuess" @bind:event="oninput" maxlength="@WordLength"
+               @onkeydown="HandleKeyDown" placeholder="@(new string('_', WordLength))" />
+        <button class="btn btn-primary" @onclick="SubmitGuess" disabled="@(_currentGuess.Length != WordLength)">
+            Guess
+        </button>
+    </div>
+    <p class="text-center text-muted">Attempt @(AttemptsUsed + 1) of @Question.MaxAttempts</p>
+}
+
+<style>
+    .wordle-cell {
+        width: 50px;
+        height: 50px;
+        border: 2px solid #dee2e6;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        font-weight: bold;
+        text-transform: uppercase;
+    }
+    .wordle-correct {
+        background-color: #28a745;
+        border-color: #28a745;
+        color: white;
+    }
+    .wordle-present {
+        background-color: #ffc107;
+        border-color: #ffc107;
+        color: white;
+    }
+    .wordle-absent {
+        background-color: #6c757d;
+        border-color: #6c757d;
+        color: white;
+    }
+</style>
+
+@code {
+    [Parameter, EditorRequired] public Question Question { get; set; } = null!;
+    [Parameter] public List<WordleAttempt> Attempts { get; set; } = [];
+    [Parameter] public int AttemptsUsed { get; set; }
+    [Parameter] public bool IsSolved { get; set; }
+    [Parameter] public bool IsOutOfAttempts { get; set; }
+    [Parameter] public int PointsAwarded { get; set; }
+    [Parameter] public EventCallback<string> OnGuessSubmitted { get; set; }
+
+    private string _currentGuess = string.Empty;
+    private int WordLength => Question.CorrectAnswer?.Length ?? 5;
+
+    private string GetLetter(int row, int col)
+    {
+        if (row < Attempts.Count && col < Attempts[row].Guess.Length)
+        {
+            return Attempts[row].Guess[col].ToString();
+        }
+        if (row == Attempts.Count && col < _currentGuess.Length)
+        {
+            return _currentGuess[col].ToString().ToUpper();
+        }
+        return "";
+    }
+
+    private string GetColorClass(int row, int col)
+    {
+        if (row >= Attempts.Count || col >= Attempts[row].Result.Length)
+        {
+            return "";
+        }
+
+        return Attempts[row].Result[col] switch
+        {
+            'C' => "wordle-correct",
+            'Y' => "wordle-present",
+            'N' => "wordle-absent",
+            _ => ""
+        };
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && _currentGuess.Length == WordLength)
+        {
+            await SubmitGuess();
+        }
+    }
+
+    private async Task SubmitGuess()
+    {
+        if (_currentGuess.Length == WordLength && !IsSolved && !IsOutOfAttempts)
+        {
+            await OnGuessSubmitted.InvokeAsync(_currentGuess);
+            _currentGuess = string.Empty;
+        }
+    }
+}

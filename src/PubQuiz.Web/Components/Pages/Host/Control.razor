@@ -1,11 +1,12 @@
 @page "/host/control/{GameCode}"
+@using PubQuiz.Web.Components.Host
 @inject GameService GameService
 @inject NavigationManager Navigation
 @inject IHubContext<PubQuiz.Web.Hubs.GameHub> HubContext
 @implements IAsyncDisposable
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 
-<PageTitle>Game Control - PubQuiz</PageTitle>
+<PageTitle>Game Control - Pause-Quiz</PageTitle>
 
 @if (_game == null)
 {
@@ -61,7 +62,14 @@ else
                         {
                             <div class="text-center py-4">
                                 <h5>Question @(_game.CurrentQuestionIndex + 1) Results</h5>
-                                <p>Correct answer: <strong>@((char)('A' + _currentQuestion.CorrectOptionIndex)). @_currentQuestion.Options[_currentQuestion.CorrectOptionIndex]</strong></p>
+                                @if (_currentQuestion.Type == QuestionType.MultipleChoice)
+                                {
+                                    <p>Correct answer: <strong>@((char)('A' + _currentQuestion.CorrectOptionIndex)). @_currentQuestion.Options[_currentQuestion.CorrectOptionIndex]</strong></p>
+                                }
+                                else
+                                {
+                                    <p>Correct answer: <strong>@_currentQuestion.CorrectAnswer</strong></p>
+                                }
                                 @if (_game.CurrentQuestionIndex < _questions.Count - 1)
                                 {
                                     <button class="btn btn-primary btn-lg" @onclick="NextQuestion">
@@ -80,29 +88,58 @@ else
                         {
                             <div class="mb-4">
                                 <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <h5 class="mb-0">Question @(_game.CurrentQuestionIndex + 1) of @_questions.Count</h5>
-                                    @if (_showingQuestion)
+                                    <h5 class="mb-0">
+                                        Question @(_game.CurrentQuestionIndex + 1) of @_questions.Count
+                                        <span class="badge bg-secondary ms-2">@GetQuestionTypeName()</span>
+                                    </h5>
+                                    @if (_showingQuestion && _currentQuestion.Type != QuestionType.Wordle)
                                     {
                                         <span class="badge bg-warning text-dark fs-5">@_timeRemaining s</span>
                                     }
                                 </div>
 
-                                <div class="card bg-light">
+                                <div class="card bg-light mb-3">
                                     <div class="card-body">
                                         <h4>@_currentQuestion.Text</h4>
-                                        <div class="row mt-3">
-                                            @for (int i = 0; i < _currentQuestion.Options.Count; i++)
-                                            {
-                                                var idx = i;
-                                                <div class="col-6 mb-2">
-                                                    <div class="p-2 rounded @(GetOptionClass(idx))">
-                                                        @((char)('A' + idx)). @_currentQuestion.Options[idx]
+                                        @if (_currentQuestion.Type == QuestionType.MultipleChoice)
+                                        {
+                                            <div class="row mt-3">
+                                                @for (int i = 0; i < _currentQuestion.Options.Count; i++)
+                                                {
+                                                    var idx = i;
+                                                    <div class="col-6 mb-2">
+                                                        <div class="p-2 rounded @(GetOptionClass(idx))">
+                                                            @((char)('A' + idx)). @_currentQuestion.Options[idx]
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            }
-                                        </div>
+                                                }
+                                            </div>
+                                        }
+                                        else if (_currentQuestion.Type == QuestionType.OpenEnded)
+                                        {
+                                            <p class="text-muted mt-2">Teams will type their own answer (you'll approve/reject)</p>
+                                        }
+                                        else if (_currentQuestion.Type == QuestionType.Wordle)
+                                        {
+                                            <p class="text-muted mt-2">Word to guess: <strong class="text-primary">@_currentQuestion.CorrectAnswer?.ToUpper()</strong> (@_currentQuestion.MaxAttempts attempts)</p>
+                                        }
                                     </div>
                                 </div>
+
+                                @if (_showingQuestion && _currentQuestion.Type == QuestionType.OpenEnded)
+                                {
+                                    <OpenEndedReviewPanel
+                                        Answers="_openEndedAnswers"
+                                        OnApprove="ApproveAnswer"
+                                        OnReject="RejectAnswer" />
+                                }
+                                else if (_showingQuestion && _currentQuestion.Type == QuestionType.Wordle)
+                                {
+                                    <WordleProgressPanel
+                                        Progress="_wordleProgress"
+                                        TotalTeams="_game.Teams.Count"
+                                        MaxAttempts="_currentQuestion.MaxAttempts" />
+                                }
 
                                 <div class="mt-3 text-center">
                                     @if (!_showingQuestion)
@@ -111,10 +148,10 @@ else
                                             Show Question to Teams
                                         </button>
                                     }
-                                    else if (_timeRemaining <= 0 || _answeredTeams.Count == _game.Teams.Count)
+                                    else if (CanShowResults())
                                     {
                                         <button class="btn btn-info btn-lg" @onclick="ShowQuestionResults">
-                                            Show Results @(_answeredTeams.Count == _game.Teams.Count && _timeRemaining > 0 ? "(All answered)" : "")
+                                            Show Results @GetShowResultsHint()
                                         </button>
                                     }
                                 </div>
@@ -199,6 +236,9 @@ else
     private HubConnection? _hubConnection;
     private AuthModel _authModel = new();
 
+    private List<Answer> _openEndedAnswers = [];
+    private List<WordleProgress> _wordleProgress = [];
+
     protected override async Task OnInitializedAsync()
     {
         _game = await GameService.GetGameByCodeAsync(GameCode);
@@ -237,6 +277,43 @@ else
             await InvokeAsync(StateHasChanged);
         });
 
+        _hubConnection.On<Guid, string, string>("OpenEndedSubmitted", async (teamId, teamName, answer) =>
+        {
+            _answeredTeams.Add(teamId);
+            _openEndedAnswers = await GameService.GetAllAnswersForQuestionAsync(_game!.Id, _game.CurrentQuestionIndex);
+            await InvokeAsync(StateHasChanged);
+        });
+
+        _hubConnection.On<Guid, int, bool, bool>("WordleProgress", async (teamId, attemptsUsed, solved, outOfAttempts) =>
+        {
+            var existing = _wordleProgress.FirstOrDefault(p => p.TeamId == teamId);
+            if (existing != null)
+            {
+                existing.AttemptsUsed = attemptsUsed;
+                existing.Solved = solved;
+                existing.OutOfAttempts = outOfAttempts;
+            }
+            else
+            {
+                var team = _game!.Teams.FirstOrDefault(t => t.Id == teamId);
+                _wordleProgress.Add(new WordleProgress
+                {
+                    TeamId = teamId,
+                    TeamName = team?.Name ?? "Unknown",
+                    AttemptsUsed = attemptsUsed,
+                    Solved = solved,
+                    OutOfAttempts = outOfAttempts
+                });
+            }
+
+            if (solved || outOfAttempts)
+            {
+                _answeredTeams.Add(teamId);
+            }
+
+            await InvokeAsync(StateHasChanged);
+        });
+
         await _hubConnection.StartAsync();
         await _hubConnection.SendAsync("JoinGameGroup", GameCode);
         _leaderboard = await GameService.GetLeaderboardAsync(_game!.Id);
@@ -258,10 +335,16 @@ else
                 var elapsed = (DateTime.UtcNow - _game.QuestionStartedAt.Value).TotalSeconds;
                 _timeRemaining = Math.Max(0, _currentQuestion.TimeLimitSeconds - (int)elapsed);
 
-                if (_timeRemaining > 0)
+                _showingQuestion = true;
+                _showingResults = false;
+
+                if (_currentQuestion.Type == QuestionType.OpenEnded)
                 {
-                    _showingQuestion = true;
-                    _showingResults = false;
+                    _openEndedAnswers = await GameService.GetAllAnswersForQuestionAsync(_game.Id, _game.CurrentQuestionIndex);
+                }
+
+                if (_timeRemaining > 0 && _currentQuestion.Type != QuestionType.Wordle)
+                {
                     _timer = new System.Threading.Timer(async _ =>
                     {
                         _timeRemaining--;
@@ -271,11 +354,6 @@ else
                         }
                         await InvokeAsync(StateHasChanged);
                     }, null, 1000, 1000);
-                }
-                else
-                {
-                    _showingQuestion = true;
-                    _showingResults = false;
                 }
             }
         }
@@ -309,20 +387,75 @@ else
         _showingQuestion = true;
         _showingResults = false;
         _answeredTeams.Clear();
+        _openEndedAnswers = [];
+        _wordleProgress = [];
         _timeRemaining = _currentQuestion!.TimeLimitSeconds;
 
         await GameService.ShowQuestionToTeamsAsync(_game!.Id);
         await HubContext.Clients.Group(GameCode).SendAsync("QuestionStarted", _game!.CurrentQuestionIndex, _currentQuestion);
 
-        _timer = new System.Threading.Timer(async _ =>
+        if (_currentQuestion.Type != QuestionType.Wordle)
         {
-            _timeRemaining--;
-            if (_timeRemaining <= 0)
+            _timer = new System.Threading.Timer(async _ =>
             {
-                _timer?.Dispose();
-            }
-            await InvokeAsync(StateHasChanged);
-        }, null, 1000, 1000);
+                _timeRemaining--;
+                if (_timeRemaining <= 0)
+                {
+                    _timer?.Dispose();
+                }
+                await InvokeAsync(StateHasChanged);
+            }, null, 1000, 1000);
+        }
+    }
+
+    private async Task ApproveAnswer(Guid answerId)
+    {
+        await GameService.ApproveAnswerAsync(answerId, true);
+        _openEndedAnswers = await GameService.GetAllAnswersForQuestionAsync(_game!.Id, _game.CurrentQuestionIndex);
+
+        var answer = _openEndedAnswers.FirstOrDefault(a => a.Id == answerId);
+        if (answer != null)
+        {
+            await HubContext.Clients.Group(GameCode).SendAsync("AnswerReviewed", answer.TeamId, true, answer.PointsAwarded);
+        }
+    }
+
+    private async Task RejectAnswer(Guid answerId)
+    {
+        await GameService.ApproveAnswerAsync(answerId, false);
+        _openEndedAnswers = await GameService.GetAllAnswersForQuestionAsync(_game!.Id, _game.CurrentQuestionIndex);
+
+        var answer = _openEndedAnswers.FirstOrDefault(a => a.Id == answerId);
+        if (answer != null)
+        {
+            await HubContext.Clients.Group(GameCode).SendAsync("AnswerReviewed", answer.TeamId, false, 0);
+        }
+    }
+
+    private bool CanShowResults()
+    {
+        if (_currentQuestion == null) return false;
+
+        return _currentQuestion.Type switch
+        {
+            QuestionType.MultipleChoice => _timeRemaining <= 0 || _answeredTeams.Count == _game!.Teams.Count,
+            QuestionType.OpenEnded => _openEndedAnswers.All(a => a.Status != AnswerStatus.Pending) && _openEndedAnswers.Count > 0,
+            QuestionType.Wordle => _wordleProgress.Count == _game!.Teams.Count && _wordleProgress.All(p => p.Solved || p.OutOfAttempts),
+            _ => false
+        };
+    }
+
+    private string GetShowResultsHint()
+    {
+        if (_currentQuestion == null) return "";
+
+        return _currentQuestion.Type switch
+        {
+            QuestionType.MultipleChoice when _answeredTeams.Count == _game!.Teams.Count && _timeRemaining > 0 => "(All answered)",
+            QuestionType.OpenEnded => "(All reviewed)",
+            QuestionType.Wordle => "(All finished)",
+            _ => ""
+        };
     }
 
     private async Task ShowQuestionResults()
@@ -339,7 +472,10 @@ else
         _game!.CurrentQuestionIndex++;
         _currentQuestion = _questions[_game.CurrentQuestionIndex];
         _showingResults = false;
+        _showingQuestion = false;
         _answeredTeams.Clear();
+        _openEndedAnswers = [];
+        _wordleProgress = [];
         await GameService.StartQuestionAsync(_game.Id, _game.CurrentQuestionIndex);
         _game = await GameService.GetGameByIdAsync(_game.Id);
     }
@@ -352,6 +488,14 @@ else
         await HubContext.Clients.Group(GameCode).SendAsync("GameEnded", _leaderboard);
         _showingResults = false;
     }
+
+    private string GetQuestionTypeName() => _currentQuestion?.Type switch
+    {
+        QuestionType.MultipleChoice => "Multiple Choice",
+        QuestionType.OpenEnded => "Open Answer",
+        QuestionType.Wordle => "Wordle",
+        _ => "Question"
+    };
 
     private string GetStatusBadgeClass() => _game?.Status switch
     {

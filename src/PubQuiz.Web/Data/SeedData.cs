@@ -20,6 +20,7 @@ public static class SeedData
             new()
             {
                 Id = Guid.NewGuid(),
+                Type = QuestionType.MultipleChoice,
                 Text = "What is the capital of France?",
                 Options = ["Berlin", "Paris", "London", "Madrid"],
                 CorrectOptionIndex = 1,
@@ -28,6 +29,7 @@ public static class SeedData
             new()
             {
                 Id = Guid.NewGuid(),
+                Type = QuestionType.MultipleChoice,
                 Text = "Which planet is known as the Red Planet?",
                 Options = ["Venus", "Jupiter", "Mars", "Saturn"],
                 CorrectOptionIndex = 2,
@@ -36,6 +38,7 @@ public static class SeedData
             new()
             {
                 Id = Guid.NewGuid(),
+                Type = QuestionType.MultipleChoice,
                 Text = "What year did World War II end?",
                 Options = ["1943", "1944", "1945", "1946"],
                 CorrectOptionIndex = 2,
@@ -44,6 +47,7 @@ public static class SeedData
             new()
             {
                 Id = Guid.NewGuid(),
+                Type = QuestionType.MultipleChoice,
                 Text = "Who painted the Mona Lisa?",
                 Options = ["Michelangelo", "Leonardo da Vinci", "Raphael", "Donatello"],
                 CorrectOptionIndex = 1,
@@ -52,6 +56,23 @@ public static class SeedData
             new()
             {
                 Id = Guid.NewGuid(),
+                Type = QuestionType.OpenEnded,
+                Text = "Name a country that starts with the letter 'A'",
+                AcceptedAnswers = ["Afghanistan", "Albania", "Algeria", "Andorra", "Angola", "Argentina", "Armenia", "Australia", "Austria", "Azerbaijan"],
+                TimeLimitSeconds = 30
+            },
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Type = QuestionType.OpenEnded,
+                Text = "Name a famous scientist",
+                AcceptedAnswers = ["Einstein", "Newton", "Darwin", "Curie", "Hawking", "Tesla", "Galileo", "Pasteur", "Feynman", "Bohr", "Planck", "Faraday", "Maxwell", "Edison", "Archimedes", "Copernicus", "Kepler", "Heisenberg", "Schrodinger", "Dirac", "Albert Einstein", "Isaac Newton", "Charles Darwin", "Marie Curie", "Stephen Hawking", "Nikola Tesla"],
+                TimeLimitSeconds = 30
+            },
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Type = QuestionType.MultipleChoice,
                 Text = "What is the chemical symbol for gold?",
                 Options = ["Go", "Gd", "Au", "Ag"],
                 CorrectOptionIndex = 2,
@@ -60,6 +81,7 @@ public static class SeedData
             new()
             {
                 Id = Guid.NewGuid(),
+                Type = QuestionType.MultipleChoice,
                 Text = "Which ocean is the largest?",
                 Options = ["Atlantic", "Indian", "Arctic", "Pacific"],
                 CorrectOptionIndex = 3,
@@ -68,6 +90,25 @@ public static class SeedData
             new()
             {
                 Id = Guid.NewGuid(),
+                Type = QuestionType.Wordle,
+                Text = "Guess the 5-letter word related to music",
+                CorrectAnswer = "PIANO",
+                MaxAttempts = 6,
+                TimeLimitSeconds = 120
+            },
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Type = QuestionType.Wordle,
+                Text = "Guess the 5-letter word - it's a place where you live",
+                CorrectAnswer = "HOUSE",
+                MaxAttempts = 6,
+                TimeLimitSeconds = 120
+            },
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Type = QuestionType.MultipleChoice,
                 Text = "What is the smallest country in the world?",
                 Options = ["Monaco", "Vatican City", "San Marino", "Liechtenstein"],
                 CorrectOptionIndex = 1,
@@ -76,25 +117,10 @@ public static class SeedData
             new()
             {
                 Id = Guid.NewGuid(),
+                Type = QuestionType.MultipleChoice,
                 Text = "How many bones are in the adult human body?",
                 Options = ["186", "206", "226", "246"],
                 CorrectOptionIndex = 1,
-                TimeLimitSeconds = 20
-            },
-            new()
-            {
-                Id = Guid.NewGuid(),
-                Text = "What is the largest mammal on Earth?",
-                Options = ["African Elephant", "Blue Whale", "Giraffe", "Hippopotamus"],
-                CorrectOptionIndex = 1,
-                TimeLimitSeconds = 15
-            },
-            new()
-            {
-                Id = Guid.NewGuid(),
-                Text = "In what year did the Titanic sink?",
-                Options = ["1910", "1911", "1912", "1913"],
-                CorrectOptionIndex = 2,
                 TimeLimitSeconds = 20
             }
         };

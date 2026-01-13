@@ -11,6 +11,7 @@ builder.Services.AddDbContext<PubQuizDbContext>(options =>
 
 builder.Services.AddScoped<GameService>();
 builder.Services.AddSingleton<ScoringService>();
+builder.Services.AddSingleton<WordleService>();
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();

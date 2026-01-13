@@ -1,0 +1,71 @@
+@using PubQuiz.Web.Models
+
+<h3 class="mb-4">@Question.Text</h3>
+
+@if (HasAnswered)
+{
+    <div class="card">
+        <div class="card-body text-center">
+            @if (AnswerStatus == AnswerStatus.Pending)
+            {
+                <div class="alert alert-info mb-0">
+                    <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                    Your answer: <strong>@SubmittedAnswer</strong>
+                    <br/>
+                    <small>Waiting for host to review...</small>
+                </div>
+            }
+            else if (AnswerStatus == AnswerStatus.Approved)
+            {
+                <div class="alert alert-success mb-0">
+                    Correct! +@PointsAwarded points
+                    <br/>
+                    Your answer: <strong>@SubmittedAnswer</strong>
+                </div>
+            }
+            else if (AnswerStatus == AnswerStatus.Rejected)
+            {
+                <div class="alert alert-danger mb-0">
+                    Incorrect!
+                    <br/>
+                    Your answer: <strong>@SubmittedAnswer</strong>
+                </div>
+            }
+        </div>
+    </div>
+}
+else
+{
+    <div class="card">
+        <div class="card-body">
+            <div class="mb-3">
+                <input type="text" class="form-control form-control-lg" @bind="_answer" @bind:event="oninput"
+                       placeholder="Type your answer..." disabled="@(TimeRemaining <= 0)" />
+            </div>
+            <button class="btn btn-primary btn-lg w-100" @onclick="SubmitAnswer"
+                    disabled="@(string.IsNullOrWhiteSpace(_answer) || TimeRemaining <= 0)">
+                Submit Answer
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public Question Question { get; set; } = null!;
+    [Parameter] public int TimeRemaining { get; set; }
+    [Parameter] public bool HasAnswered { get; set; }
+    [Parameter] public string SubmittedAnswer { get; set; } = string.Empty;
+    [Parameter] public AnswerStatus AnswerStatus { get; set; }
+    [Parameter] public int PointsAwarded { get; set; }
+    [Parameter] public EventCallback<string> OnAnswerSubmitted { get; set; }
+
+    private string _answer = string.Empty;
+
+    private async Task SubmitAnswer()
+    {
+        if (!string.IsNullOrWhiteSpace(_answer))
+        {
+            await OnAnswerSubmitted.InvokeAsync(_answer);
+        }
+    }
+}

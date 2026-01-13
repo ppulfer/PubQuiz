@@ -1,0 +1,70 @@
+@using PubQuiz.Web.Models
+
+<div class="card mb-3">
+    <div class="card-header">
+        <h5 class="mb-0">Review Answers (@ReviewedCount / @TotalCount reviewed)</h5>
+    </div>
+    <div class="card-body p-0">
+        @if (Answers.Count == 0)
+        {
+            <div class="text-center text-muted py-4">
+                No answers submitted yet
+            </div>
+        }
+        else
+        {
+            <table class="table table-striped mb-0">
+                <thead>
+                    <tr>
+                        <th>Team</th>
+                        <th>Answer</th>
+                        <th class="text-end">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var answer in Answers)
+                    {
+                        <tr>
+                            <td>@answer.Team.Name</td>
+                            <td>
+                                <strong>@answer.TextAnswer</strong>
+                                @if (answer.Status == AnswerStatus.Approved)
+                                {
+                                    <span class="badge bg-success ms-2">Approved</span>
+                                }
+                                else if (answer.Status == AnswerStatus.Rejected)
+                                {
+                                    <span class="badge bg-danger ms-2">Rejected</span>
+                                }
+                            </td>
+                            <td class="text-end">
+                                @if (answer.Status == AnswerStatus.Pending)
+                                {
+                                    <button class="btn btn-success btn-sm me-1" @onclick="() => OnApprove.InvokeAsync(answer.Id)">
+                                        Approve
+                                    </button>
+                                    <button class="btn btn-danger btn-sm" @onclick="() => OnReject.InvokeAsync(answer.Id)">
+                                        Reject
+                                    </button>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">+@answer.PointsAwarded pts</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public List<Answer> Answers { get; set; } = [];
+    [Parameter] public EventCallback<Guid> OnApprove { get; set; }
+    [Parameter] public EventCallback<Guid> OnReject { get; set; }
+
+    private int ReviewedCount => Answers.Count(a => a.Status != AnswerStatus.Pending);
+    private int TotalCount => Answers.Count;
+}

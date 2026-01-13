@@ -1,0 +1,59 @@
+@using PubQuiz.Web.Models
+@using PubQuiz.Web.Services
+
+<div class="card mb-3">
+    <div class="card-header">
+        <h5 class="mb-0">Wordle Progress (@FinishedCount / @TotalTeams finished)</h5>
+    </div>
+    <div class="card-body p-0">
+        @if (Progress.Count == 0)
+        {
+            <div class="text-center text-muted py-4">
+                No teams playing yet
+            </div>
+        }
+        else
+        {
+            <table class="table table-striped mb-0">
+                <thead>
+                    <tr>
+                        <th>Team</th>
+                        <th>Attempts</th>
+                        <th class="text-end">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Progress)
+                    {
+                        <tr>
+                            <td>@item.TeamName</td>
+                            <td>@item.AttemptsUsed / @MaxAttempts</td>
+                            <td class="text-end">
+                                @if (item.Solved)
+                                {
+                                    <span class="badge bg-success">Solved!</span>
+                                }
+                                else if (item.OutOfAttempts)
+                                {
+                                    <span class="badge bg-danger">Failed</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-warning text-dark">Playing...</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public List<WordleProgress> Progress { get; set; } = [];
+    [Parameter] public int TotalTeams { get; set; }
+    [Parameter] public int MaxAttempts { get; set; } = 6;
+
+    private int FinishedCount => Progress.Count(p => p.Solved || p.OutOfAttempts);
+}

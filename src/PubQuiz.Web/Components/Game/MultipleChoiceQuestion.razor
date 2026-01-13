@@ -1,0 +1,47 @@
+@using PubQuiz.Web.Models
+
+<h3 class="mb-4">@Question.Text</h3>
+
+@if (HasAnswered)
+{
+    <div class="alert alert-info text-center">
+        Answer submitted! Waiting for results...
+    </div>
+    <div class="row">
+        @for (int i = 0; i < Question.Options.Count; i++)
+        {
+            var idx = i;
+            <div class="col-6 mb-3">
+                <div class="card h-100 @(SelectedOption == idx ? "border-primary bg-primary text-white" : "")">
+                    <div class="card-body text-center">
+                        <h5>@((char)('A' + idx))</h5>
+                        <p class="mb-0">@Question.Options[idx]</p>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+else
+{
+    <div class="row">
+        @for (int i = 0; i < Question.Options.Count; i++)
+        {
+            var idx = i;
+            <div class="col-6 mb-3">
+                <button class="btn btn-outline-primary w-100 h-100 py-4" @onclick="() => OnAnswerSelected.InvokeAsync(idx)" disabled="@(TimeRemaining <= 0)">
+                    <h4>@((char)('A' + idx))</h4>
+                    <p class="mb-0">@Question.Options[idx]</p>
+                </button>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public Question Question { get; set; } = null!;
+    [Parameter] public int TimeRemaining { get; set; }
+    [Parameter] public bool HasAnswered { get; set; }
+    [Parameter] public int SelectedOption { get; set; } = -1;
+    [Parameter] public EventCallback<int> OnAnswerSelected { get; set; }
+}

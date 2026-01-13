@@ -1,17 +1,15 @@
 @inherits LayoutComponentBase
 
-<div class="container-fluid vh-100 d-flex flex-column">
-    <nav class="navbar navbar-dark bg-primary">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="/">PubQuiz</a>
-            <div>
-                <a href="/admin" class="btn btn-outline-light btn-sm me-2">Admin</a>
-                <a href="/host/login" class="btn btn-outline-light btn-sm">Host a Game</a>
-            </div>
-        </div>
-    </nav>
-
-    <main class="flex-grow-1 py-4">
+<div class="d-flex flex-column vh-100" style="overflow: hidden;">
+    <div class="d-flex" style="height: 8px; flex-shrink: 0;">
+        <div style="flex: 1; background: #C4A277;"></div>
+        <div style="flex: 1; background: #FFC32D;"></div>
+        <div style="flex: 1; background: #F67858;"></div>
+        <div style="flex: 1; background: #84D160;"></div>
+        <div style="flex: 1; background: #B384D3;"></div>
+        <div style="flex: 1; background: #72C7F9;"></div>
+    </div>
+    <main class="flex-grow-1 p-4">
         @Body
     </main>
 </div>
