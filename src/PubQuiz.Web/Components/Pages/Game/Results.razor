@@ -1,0 +1,96 @@
+@page "/game/results/{GameCode}/{TeamId:guid}"
+@inject GameService GameService
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>Final Results - PubQuiz</PageTitle>
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow mt-4">
+                <div class="card-body text-center">
+                    <h1 class="mb-4">Game Over!</h1>
+
+                    @if (_leaderboard.Count > 0)
+                    {
+                        var winner = _leaderboard[0];
+                        <div class="mb-4">
+                            <h2 class="text-warning">Winner</h2>
+                            <div class="display-4 fw-bold">@winner.TeamName</div>
+                            <div class="display-6 text-muted">@winner.TotalPoints points</div>
+                        </div>
+                    }
+
+                    <h4 class="mt-5 mb-3">Final Leaderboard</h4>
+                    <table class="table table-lg">
+                        <thead>
+                            <tr>
+                                <th>Rank</th>
+                                <th>Team</th>
+                                <th class="text-end">Correct</th>
+                                <th class="text-end">Points</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @{int rank = 1;}
+                            @foreach (var team in _leaderboard)
+                            {
+                                <tr class="@GetRowClass(team, rank)">
+                                    <td>
+                                        @if (rank == 1)
+                                        {<span class="fs-4">🥇</span>}
+                                        else if (rank == 2)
+                                        {<span class="fs-4">🥈</span>}
+                                        else if (rank == 3)
+                                        {<span class="fs-4">🥉</span>}
+                                        else
+                                        {@rank}
+                                    </td>
+                                    <td class="@(team.TeamId == TeamId ? "fw-bold" : "")">
+                                        @team.TeamName
+                                        @if (team.TeamId == TeamId)
+                                        {<span class="badge bg-primary ms-2">You</span>}
+                                    </td>
+                                    <td class="text-end">@team.CorrectAnswers</td>
+                                    <td class="text-end fw-bold">@team.TotalPoints</td>
+                                </tr>
+                                rank++;
+                            }
+                        </tbody>
+                    </table>
+
+                    <div class="mt-5">
+                        <a href="/" class="btn btn-primary btn-lg">Play Again</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string GameCode { get; set; } = string.Empty;
+    [Parameter] public Guid TeamId { get; set; }
+
+    private List<TeamScore> _leaderboard = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var game = await GameService.GetGameByCodeAsync(GameCode);
+        if (game == null)
+        {
+            Navigation.NavigateTo("/");
+            return;
+        }
+
+        _leaderboard = await GameService.GetLeaderboardAsync(game.Id);
+    }
+
+    private string GetRowClass(TeamScore team, int rank)
+    {
+        if (team.TeamId == TeamId) return "table-primary";
+        if (rank == 1) return "table-warning";
+        return "";
+    }
+}

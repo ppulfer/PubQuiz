@@ -1,0 +1,222 @@
+@page "/"
+@inject GameService GameService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@rendermode InteractiveServer
+
+<PageTitle>Join Game - PubQuiz</PageTitle>
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-4">
+            @if (_savedSession != null)
+            {
+                <div class="card shadow mt-5 border-success">
+                    <div class="card-body p-4 text-center">
+                        <h5 class="card-title mb-3">Active Session Found</h5>
+                        <p class="mb-1">Team: <strong>@_savedSession.TeamName</strong></p>
+                        <p class="text-muted mb-3">Game: <strong>@_savedSession.GameCode</strong></p>
+
+                        <button class="btn btn-success btn-lg w-100 mb-2" @onclick="Reconnect" disabled="@_isReconnecting">
+                            @if (_isReconnecting)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2"></span>
+                            }
+                            Reconnect
+                        </button>
+                        <button class="btn btn-outline-secondary btn-sm" @onclick="ClearSession">
+                            Join Different Game
+                        </button>
+
+                        @if (!string.IsNullOrEmpty(_reconnectError))
+                        {
+                            <div class="alert alert-warning mt-3 mb-0">@_reconnectError</div>
+                        }
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="card shadow mt-5">
+                    <div class="card-body p-4">
+                        <h2 class="card-title text-center mb-4">Join a Game</h2>
+
+                        @if (!string.IsNullOrEmpty(_errorMessage))
+                        {
+                            <div class="alert alert-danger">@_errorMessage</div>
+                        }
+
+                        <EditForm Model="@_model" OnValidSubmit="JoinGame" FormName="JoinGameForm">
+                            <DataAnnotationsValidator />
+
+                            <div class="mb-3">
+                                <label class="form-label">Game Code</label>
+                                <InputText @bind-Value="_model.GameCode" class="form-control form-control-lg text-center text-uppercase"
+                                           maxlength="6" placeholder="ABC123" />
+                                <ValidationMessage For="@(() => _model.GameCode)" />
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label">Team Name</label>
+                                <InputText @bind-Value="_model.TeamName" class="form-control form-control-lg"
+                                           maxlength="50" placeholder="Your Team Name" />
+                                <ValidationMessage For="@(() => _model.TeamName)" />
+                            </div>
+
+                            <button type="submit" class="btn btn-primary btn-lg w-100" disabled="@_isJoining">
+                                @if (_isJoining)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-2"></span>
+                                }
+                                Join Game
+                            </button>
+                        </EditForm>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private JoinGameModel _model = new();
+    private string? _errorMessage;
+    private string? _reconnectError;
+    private bool _isJoining;
+    private bool _isReconnecting;
+    private TeamSession? _savedSession;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadSavedSession();
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadSavedSession()
+    {
+        try
+        {
+            var gameCode = await JS.InvokeAsync<string?>("localStorage.getItem", "pubquiz_gameCode");
+            var teamId = await JS.InvokeAsync<string?>("localStorage.getItem", "pubquiz_teamId");
+            var teamName = await JS.InvokeAsync<string?>("localStorage.getItem", "pubquiz_teamName");
+
+            if (!string.IsNullOrEmpty(gameCode) && !string.IsNullOrEmpty(teamId) && !string.IsNullOrEmpty(teamName))
+            {
+                _savedSession = new TeamSession
+                {
+                    GameCode = gameCode,
+                    TeamId = Guid.Parse(teamId),
+                    TeamName = teamName
+                };
+            }
+        }
+        catch { }
+    }
+
+    private async Task SaveSession(string gameCode, Guid teamId, string teamName)
+    {
+        await JS.InvokeVoidAsync("localStorage.setItem", "pubquiz_gameCode", gameCode);
+        await JS.InvokeVoidAsync("localStorage.setItem", "pubquiz_teamId", teamId.ToString());
+        await JS.InvokeVoidAsync("localStorage.setItem", "pubquiz_teamName", teamName);
+    }
+
+    private async Task ClearSession()
+    {
+        await JS.InvokeVoidAsync("localStorage.removeItem", "pubquiz_gameCode");
+        await JS.InvokeVoidAsync("localStorage.removeItem", "pubquiz_teamId");
+        await JS.InvokeVoidAsync("localStorage.removeItem", "pubquiz_teamName");
+        _savedSession = null;
+    }
+
+    private async Task Reconnect()
+    {
+        if (_savedSession == null) return;
+
+        _isReconnecting = true;
+        _reconnectError = null;
+
+        try
+        {
+            var game = await GameService.GetGameByCodeAsync(_savedSession.GameCode);
+            if (game == null)
+            {
+                _reconnectError = "Game no longer exists.";
+                await ClearSession();
+                return;
+            }
+
+            if (game.Status == GameStatus.Finished)
+            {
+                _reconnectError = "Game has ended.";
+                await ClearSession();
+                return;
+            }
+
+            var team = game.Teams.FirstOrDefault(t => t.Id == _savedSession.TeamId);
+            if (team == null)
+            {
+                _reconnectError = "Team not found in game.";
+                await ClearSession();
+                return;
+            }
+
+            var targetPage = game.Status == GameStatus.Waiting ? "lobby" : "play";
+            Navigation.NavigateTo($"/game/{targetPage}/{game.Code}/{team.Id}");
+        }
+        finally
+        {
+            _isReconnecting = false;
+        }
+    }
+
+    private async Task JoinGame()
+    {
+        _errorMessage = null;
+        _isJoining = true;
+
+        try
+        {
+            var game = await GameService.GetGameByCodeAsync(_model.GameCode);
+            if (game == null)
+            {
+                _errorMessage = "Game not found. Please check the code and try again.";
+                return;
+            }
+
+            if (game.Status == GameStatus.Finished)
+            {
+                _errorMessage = "This game has already ended.";
+                return;
+            }
+
+            var team = await GameService.JoinGameAsync(game.Id, _model.TeamName);
+            await SaveSession(game.Code, team.Id, team.Name);
+            Navigation.NavigateTo($"/game/lobby/{game.Code}/{team.Id}");
+        }
+        finally
+        {
+            _isJoining = false;
+        }
+    }
+
+    private class JoinGameModel
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Game code is required")]
+        [System.ComponentModel.DataAnnotations.StringLength(6, MinimumLength = 6, ErrorMessage = "Game code must be 6 characters")]
+        public string GameCode { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Team name is required")]
+        [System.ComponentModel.DataAnnotations.StringLength(50, MinimumLength = 1, ErrorMessage = "Team name must be 1-50 characters")]
+        public string TeamName { get; set; } = string.Empty;
+    }
+
+    private class TeamSession
+    {
+        public string GameCode { get; set; } = string.Empty;
+        public Guid TeamId { get; set; }
+        public string TeamName { get; set; } = string.Empty;
+    }
+}

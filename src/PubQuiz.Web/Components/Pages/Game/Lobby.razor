@@ -1,0 +1,120 @@
+@page "/game/lobby/{GameCode}/{TeamId:guid}"
+@inject GameService GameService
+@inject NavigationManager Navigation
+@implements IAsyncDisposable
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+<PageTitle>Waiting Room - PubQuiz</PageTitle>
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow mt-5">
+                <div class="card-body p-4 text-center">
+                    @if (_team == null)
+                    {
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <p class="mt-3">Loading...</p>
+                    }
+                    else
+                    {
+                        <h2 class="mb-4">Welcome, @_team.Name!</h2>
+
+                        <div class="mb-4">
+                            <p class="text-muted mb-2">Game Code</p>
+                            <div class="display-4 fw-bold text-primary font-monospace">@GameCode</div>
+                        </div>
+
+                        <div class="alert alert-info">
+                            <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                            Waiting for the host to start the game...
+                        </div>
+
+                        <div class="mt-4">
+                            <h5>Teams in lobby:</h5>
+                            <div class="d-flex flex-wrap justify-content-center gap-2 mt-2">
+                                @foreach (var team in _teams)
+                                {
+                                    <span class="badge bg-primary fs-6 @(team.Id == TeamId ? "bg-success" : "")">
+                                        @team.Name
+                                    </span>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string GameCode { get; set; } = string.Empty;
+    [Parameter] public Guid TeamId { get; set; }
+
+    private Team? _team;
+    private List<Team> _teams = [];
+    private HubConnection? _hubConnection;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var game = await GameService.GetGameByCodeAsync(GameCode);
+        if (game == null)
+        {
+            Navigation.NavigateTo("/");
+            return;
+        }
+
+        _team = game.Teams.FirstOrDefault(t => t.Id == TeamId);
+        if (_team == null)
+        {
+            Navigation.NavigateTo("/");
+            return;
+        }
+
+        if (game.Status == GameStatus.InProgress && game.QuestionStartedAt.HasValue)
+        {
+            Navigation.NavigateTo($"/game/play/{GameCode}/{TeamId}");
+            return;
+        }
+
+        if (game.Status == GameStatus.Finished)
+        {
+            Navigation.NavigateTo($"/game/results/{GameCode}/{TeamId}");
+            return;
+        }
+
+        _teams = game.Teams;
+
+        _hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/gamehub"))
+            .Build();
+
+        _hubConnection.On<string>("TeamJoined", async (teamName) =>
+        {
+            var updatedGame = await GameService.GetGameByCodeAsync(GameCode);
+            if (updatedGame != null)
+            {
+                _teams = updatedGame.Teams;
+                await InvokeAsync(StateHasChanged);
+            }
+        });
+
+        _hubConnection.On<int, Question>("QuestionStarted", (questionIndex, question) =>
+        {
+            Navigation.NavigateTo($"/game/play/{GameCode}/{TeamId}");
+        });
+
+        await _hubConnection.StartAsync();
+        await _hubConnection.SendAsync("JoinGameGroup", GameCode);
+        await _hubConnection.SendAsync("NotifyTeamJoined", GameCode, _team.Name);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_hubConnection != null)
+        {
+            await _hubConnection.DisposeAsync();
+        }
+    }
+}

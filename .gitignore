@@ -1,0 +1,36 @@
+# Build results
+bin/
+obj/
+out/
+
+# NuGet
+*.nupkg
+packages/
+
+# User-specific files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# IDE
+.idea/
+.vs/
+*.swp
+*~
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+
+# Local settings
+appsettings.*.json
+!appsettings.json
+!appsettings.Development.json
+
+# Database
+*.db
+*.db-shm
+*.db-wal

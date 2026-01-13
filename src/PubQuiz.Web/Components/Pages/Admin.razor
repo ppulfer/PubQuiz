@@ -1,0 +1,192 @@
+@page "/admin"
+@inject GameService GameService
+@inject NavigationManager Navigation
+@implements IAsyncDisposable
+@rendermode InteractiveServer
+
+<PageTitle>Admin - PubQuiz</PageTitle>
+
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Game Administration</h2>
+        <div class="d-flex gap-2 align-items-center">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="autoRefresh" checked="@_autoRefresh" @onchange="ToggleAutoRefresh">
+                <label class="form-check-label" for="autoRefresh">Auto-refresh</label>
+            </div>
+            <button class="btn btn-outline-primary" @onclick="RefreshGames">
+                Refresh
+            </button>
+        </div>
+    </div>
+
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item">
+            <button class="nav-link @(_filter == "active" ? "active" : "")" @onclick="@(() => SetFilter("active"))">
+                Active Games <span class="badge bg-success">@_activeGames.Count</span>
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link @(_filter == "all" ? "active" : "")" @onclick="@(() => SetFilter("all"))">
+                All Games <span class="badge bg-secondary">@_allGames.Count</span>
+            </button>
+        </li>
+    </ul>
+
+    @if (_isLoading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="mt-2">Loading games...</p>
+        </div>
+    }
+    else if (!FilteredGames.Any())
+    {
+        <div class="alert alert-info">
+            No games found.
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th>Code</th>
+                        <th>Status</th>
+                        <th>Teams</th>
+                        <th>Progress</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var game in FilteredGames)
+                    {
+                        <tr>
+                            <td>
+                                <code class="fs-5">@game.Code</code>
+                            </td>
+                            <td>
+                                <span class="badge @GetStatusBadgeClass(game.Status)">
+                                    @game.Status
+                                </span>
+                            </td>
+                            <td>
+                                <span class="badge bg-info">@game.TeamCount teams</span>
+                            </td>
+                            <td>
+                                @if (game.Status == GameStatus.InProgress)
+                                {
+                                    <span>Question @(game.CurrentQuestionIndex + 1) / @_totalQuestions</span>
+                                }
+                                else if (game.Status == GameStatus.Finished)
+                                {
+                                    <span class="text-muted">Completed</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">Not started</span>
+                                }
+                            </td>
+                            <td>
+                                <small class="text-muted">@game.CreatedAt.ToLocalTime().ToString("g")</small>
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    @if (game.Status != GameStatus.Finished)
+                                    {
+                                        <a href="/host/control/@game.Code" class="btn btn-outline-primary" target="_blank">
+                                            Control
+                                        </a>
+                                    }
+                                    <button class="btn btn-outline-danger" @onclick="() => DeleteGame(game.Id)">
+                                        Delete
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    private List<GameSummary> _allGames = [];
+    private List<GameSummary> _activeGames = [];
+    private bool _isLoading = true;
+    private string _filter = "active";
+    private int _totalQuestions;
+    private System.Threading.Timer? _refreshTimer;
+    private bool _autoRefresh = true;
+
+    private IEnumerable<GameSummary> FilteredGames => _filter == "active" ? _activeGames : _allGames;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshGames();
+        _refreshTimer = new System.Threading.Timer(async _ =>
+        {
+            if (_autoRefresh)
+            {
+                await RefreshGamesQuiet();
+                await InvokeAsync(StateHasChanged);
+            }
+        }, null, 5000, 5000);
+    }
+
+    private async Task RefreshGames()
+    {
+        _isLoading = true;
+        StateHasChanged();
+
+        var questions = await GameService.GetQuestionsAsync();
+        _totalQuestions = questions.Count;
+
+        _allGames = await GameService.GetAllGamesAsync();
+        _activeGames = _allGames.Where(g => g.Status != GameStatus.Finished).ToList();
+
+        _isLoading = false;
+    }
+
+    private async Task RefreshGamesQuiet()
+    {
+        var questions = await GameService.GetQuestionsAsync();
+        _totalQuestions = questions.Count;
+
+        _allGames = await GameService.GetAllGamesAsync();
+        _activeGames = _allGames.Where(g => g.Status != GameStatus.Finished).ToList();
+    }
+
+    private void SetFilter(string filter)
+    {
+        _filter = filter;
+    }
+
+    private void ToggleAutoRefresh()
+    {
+        _autoRefresh = !_autoRefresh;
+    }
+
+    private async Task DeleteGame(Guid gameId)
+    {
+        await GameService.DeleteGameAsync(gameId);
+        await RefreshGames();
+    }
+
+    private string GetStatusBadgeClass(GameStatus status) => status switch
+    {
+        GameStatus.Waiting => "bg-warning text-dark",
+        GameStatus.InProgress => "bg-success",
+        GameStatus.Finished => "bg-secondary",
+        _ => "bg-secondary"
+    };
+
+    public ValueTask DisposeAsync()
+    {
+        _refreshTimer?.Dispose();
+        return ValueTask.CompletedTask;
+    }
+}

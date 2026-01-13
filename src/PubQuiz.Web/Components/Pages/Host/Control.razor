@@ -1,0 +1,383 @@
+@page "/host/control/{GameCode}"
+@inject GameService GameService
+@inject NavigationManager Navigation
+@inject IHubContext<PubQuiz.Web.Hubs.GameHub> HubContext
+@implements IAsyncDisposable
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+<PageTitle>Game Control - PubQuiz</PageTitle>
+
+@if (_game == null)
+{
+    <div class="container text-center mt-5">
+        <div class="spinner-border text-primary" role="status"></div>
+        <p class="mt-3">Loading game...</p>
+    </div>
+}
+else if (!_isAuthenticated)
+{
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-4">
+                <div class="card shadow mt-5">
+                    <div class="card-body p-4">
+                        <h4 class="text-center mb-3">Enter Host Password</h4>
+                        @if (_authError)
+                        {
+                            <div class="alert alert-danger">Invalid password</div>
+                        }
+                        <EditForm Model="@_authModel" OnValidSubmit="Authenticate" FormName="AuthForm">
+                            <InputText type="password" @bind-Value="_authModel.Password" class="form-control mb-3" placeholder="Password" />
+                            <button type="submit" class="btn btn-primary w-100">Login</button>
+                        </EditForm>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-8">
+                <div class="card shadow mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">Game: @_game.Code</h4>
+                        <span class="badge @GetStatusBadgeClass()">@_game.Status</span>
+                    </div>
+                    <div class="card-body">
+                        @if (_game.Status == GameStatus.Waiting)
+                        {
+                            <div class="text-center py-4">
+                                <h5>Waiting for teams to join...</h5>
+                                <p class="text-muted">@_game.Teams.Count team(s) joined</p>
+                                <button class="btn btn-success btn-lg" @onclick="StartGame" disabled="@(_game.Teams.Count == 0 || _questions.Count == 0)">
+                                    Start Game
+                                </button>
+                            </div>
+                        }
+                        else if (_showingResults && _currentQuestion != null)
+                        {
+                            <div class="text-center py-4">
+                                <h5>Question @(_game.CurrentQuestionIndex + 1) Results</h5>
+                                <p>Correct answer: <strong>@((char)('A' + _currentQuestion.CorrectOptionIndex)). @_currentQuestion.Options[_currentQuestion.CorrectOptionIndex]</strong></p>
+                                @if (_game.CurrentQuestionIndex < _questions.Count - 1)
+                                {
+                                    <button class="btn btn-primary btn-lg" @onclick="NextQuestion">
+                                        Next Question
+                                    </button>
+                                }
+                                else
+                                {
+                                    <button class="btn btn-success btn-lg" @onclick="EndGame">
+                                        End Game & Show Final Results
+                                    </button>
+                                }
+                            </div>
+                        }
+                        else if (_game.Status == GameStatus.InProgress && _currentQuestion != null)
+                        {
+                            <div class="mb-4">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h5 class="mb-0">Question @(_game.CurrentQuestionIndex + 1) of @_questions.Count</h5>
+                                    @if (_showingQuestion)
+                                    {
+                                        <span class="badge bg-warning text-dark fs-5">@_timeRemaining s</span>
+                                    }
+                                </div>
+
+                                <div class="card bg-light">
+                                    <div class="card-body">
+                                        <h4>@_currentQuestion.Text</h4>
+                                        <div class="row mt-3">
+                                            @for (int i = 0; i < _currentQuestion.Options.Count; i++)
+                                            {
+                                                var idx = i;
+                                                <div class="col-6 mb-2">
+                                                    <div class="p-2 rounded @(GetOptionClass(idx))">
+                                                        @((char)('A' + idx)). @_currentQuestion.Options[idx]
+                                                    </div>
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="mt-3 text-center">
+                                    @if (!_showingQuestion)
+                                    {
+                                        <button class="btn btn-primary btn-lg" @onclick="ShowQuestion">
+                                            Show Question to Teams
+                                        </button>
+                                    }
+                                    else if (_timeRemaining <= 0 || _answeredTeams.Count == _game.Teams.Count)
+                                    {
+                                        <button class="btn btn-info btn-lg" @onclick="ShowQuestionResults">
+                                            Show Results @(_answeredTeams.Count == _game.Teams.Count && _timeRemaining > 0 ? "(All answered)" : "")
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+                        }
+                        else if (_game.Status == GameStatus.Finished)
+                        {
+                            <div class="text-center py-4">
+                                <h3>Game Over!</h3>
+                                <p class="text-muted">Final results have been sent to all teams.</p>
+                                <a href="/host/login" class="btn btn-primary">Host New Game</a>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card shadow">
+                    <div class="card-header">
+                        <h5 class="mb-0">Leaderboard (@_leaderboard.Count teams)</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <table class="table table-striped mb-0">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Team</th>
+                                    <th class="text-end">Points</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (_leaderboard.Count == 0)
+                                {
+                                    <tr>
+                                        <td colspan="3" class="text-center text-muted py-3">No teams yet</td>
+                                    </tr>
+                                }
+                                else
+                                {
+                                    int rank = 1;
+                                    @foreach (var team in _leaderboard)
+                                    {
+                                        <tr>
+                                            <td>@rank</td>
+                                            <td>
+                                                @team.TeamName
+                                                @if (_showingQuestion && _answeredTeams.Contains(team.TeamId))
+                                                {
+                                                    <span class="badge bg-success ms-1">Answered</span>
+                                                }
+                                            </td>
+                                            <td class="text-end fw-bold">@team.TotalPoints</td>
+                                        </tr>
+                                        rank++;
+                                    }
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string GameCode { get; set; } = string.Empty;
+    [SupplyParameterFromQuery] public string Password { get; set; } = string.Empty;
+
+    private Game? _game;
+    private List<Question> _questions = [];
+    private Question? _currentQuestion;
+    private List<TeamScore> _leaderboard = [];
+    private HashSet<Guid> _answeredTeams = [];
+    private bool _isAuthenticated;
+    private bool _authError;
+    private bool _showingQuestion;
+    private bool _showingResults;
+    private int _timeRemaining;
+    private System.Threading.Timer? _timer;
+    private HubConnection? _hubConnection;
+    private AuthModel _authModel = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _game = await GameService.GetGameByCodeAsync(GameCode);
+        if (_game == null)
+        {
+            Navigation.NavigateTo("/host/login");
+            return;
+        }
+
+        _questions = await GameService.GetQuestionsAsync();
+
+        if (!string.IsNullOrEmpty(Password) && GameService.VerifyHostPassword(_game, Password))
+        {
+            _isAuthenticated = true;
+            await SetupSignalR();
+        }
+    }
+
+    private async Task SetupSignalR()
+    {
+        _hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/gamehub"))
+            .Build();
+
+        _hubConnection.On<string>("TeamJoined", async (teamName) =>
+        {
+            _game = await GameService.GetGameByIdAsync(_game!.Id);
+            _leaderboard = await GameService.GetLeaderboardAsync(_game!.Id);
+            await InvokeAsync(StateHasChanged);
+        });
+
+        _hubConnection.On<Guid>("AnswerSubmitted", async (teamId) =>
+        {
+            _answeredTeams.Add(teamId);
+            _game = await GameService.GetGameByIdAsync(_game!.Id);
+            await InvokeAsync(StateHasChanged);
+        });
+
+        await _hubConnection.StartAsync();
+        await _hubConnection.SendAsync("JoinGameGroup", GameCode);
+        _leaderboard = await GameService.GetLeaderboardAsync(_game!.Id);
+
+        await RestoreGameState();
+    }
+
+    private async Task RestoreGameState()
+    {
+        _game = await GameService.GetGameByIdAsync(_game!.Id);
+        if (_game == null) return;
+
+        if (_game.Status == GameStatus.InProgress && _game.CurrentQuestionIndex >= 0 && _game.CurrentQuestionIndex < _questions.Count)
+        {
+            _currentQuestion = _questions[_game.CurrentQuestionIndex];
+
+            if (_game.QuestionStartedAt.HasValue)
+            {
+                var elapsed = (DateTime.UtcNow - _game.QuestionStartedAt.Value).TotalSeconds;
+                _timeRemaining = Math.Max(0, _currentQuestion.TimeLimitSeconds - (int)elapsed);
+
+                if (_timeRemaining > 0)
+                {
+                    _showingQuestion = true;
+                    _showingResults = false;
+                    _timer = new System.Threading.Timer(async _ =>
+                    {
+                        _timeRemaining--;
+                        if (_timeRemaining <= 0)
+                        {
+                            _timer?.Dispose();
+                        }
+                        await InvokeAsync(StateHasChanged);
+                    }, null, 1000, 1000);
+                }
+                else
+                {
+                    _showingQuestion = true;
+                    _showingResults = false;
+                }
+            }
+        }
+    }
+
+    private async Task Authenticate()
+    {
+        if (GameService.VerifyHostPassword(_game!, _authModel.Password))
+        {
+            _isAuthenticated = true;
+            _authError = false;
+            await SetupSignalR();
+        }
+        else
+        {
+            _authError = true;
+        }
+    }
+
+    private async Task StartGame()
+    {
+        _game!.Status = GameStatus.InProgress;
+        _game.CurrentQuestionIndex = 0;
+        _currentQuestion = _questions[0];
+        await GameService.StartQuestionAsync(_game.Id, 0);
+        _game = await GameService.GetGameByIdAsync(_game.Id);
+    }
+
+    private async Task ShowQuestion()
+    {
+        _showingQuestion = true;
+        _showingResults = false;
+        _answeredTeams.Clear();
+        _timeRemaining = _currentQuestion!.TimeLimitSeconds;
+
+        await GameService.ShowQuestionToTeamsAsync(_game!.Id);
+        await HubContext.Clients.Group(GameCode).SendAsync("QuestionStarted", _game!.CurrentQuestionIndex, _currentQuestion);
+
+        _timer = new System.Threading.Timer(async _ =>
+        {
+            _timeRemaining--;
+            if (_timeRemaining <= 0)
+            {
+                _timer?.Dispose();
+            }
+            await InvokeAsync(StateHasChanged);
+        }, null, 1000, 1000);
+    }
+
+    private async Task ShowQuestionResults()
+    {
+        _timer?.Dispose();
+        _showingQuestion = false;
+        _showingResults = true;
+        _leaderboard = await GameService.GetLeaderboardAsync(_game!.Id);
+        await HubContext.Clients.Group(GameCode).SendAsync("ShowResults", _game.CurrentQuestionIndex, _leaderboard);
+    }
+
+    private async Task NextQuestion()
+    {
+        _game!.CurrentQuestionIndex++;
+        _currentQuestion = _questions[_game.CurrentQuestionIndex];
+        _showingResults = false;
+        _answeredTeams.Clear();
+        await GameService.StartQuestionAsync(_game.Id, _game.CurrentQuestionIndex);
+        _game = await GameService.GetGameByIdAsync(_game.Id);
+    }
+
+    private async Task EndGame()
+    {
+        await GameService.EndGameAsync(_game!.Id);
+        _game!.Status = GameStatus.Finished;
+        _leaderboard = await GameService.GetLeaderboardAsync(_game.Id);
+        await HubContext.Clients.Group(GameCode).SendAsync("GameEnded", _leaderboard);
+        _showingResults = false;
+    }
+
+    private string GetStatusBadgeClass() => _game?.Status switch
+    {
+        GameStatus.Waiting => "bg-warning text-dark",
+        GameStatus.InProgress => "bg-success",
+        GameStatus.Finished => "bg-secondary",
+        _ => "bg-secondary"
+    };
+
+    private string GetOptionClass(int idx)
+    {
+        if (!_showingResults) return "bg-white border";
+        return idx == _currentQuestion!.CorrectOptionIndex ? "bg-success text-white" : "bg-white border";
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _timer?.Dispose();
+        if (_hubConnection != null)
+        {
+            await _hubConnection.DisposeAsync();
+        }
+    }
+
+    private class AuthModel
+    {
+        public string Password { get; set; } = string.Empty;
+    }
+}

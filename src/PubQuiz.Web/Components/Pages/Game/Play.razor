@@ -1,0 +1,254 @@
+@page "/game/play/{GameCode}/{TeamId:guid}"
+@inject GameService GameService
+@inject NavigationManager Navigation
+@implements IAsyncDisposable
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+<PageTitle>Playing - PubQuiz</PageTitle>
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            @if (_currentQuestion == null)
+            {
+                <div class="card shadow mt-5">
+                    <div class="card-body text-center py-5">
+                        <div class="spinner-border text-primary mb-3" role="status"></div>
+                        <h4>Waiting for next question...</h4>
+                    </div>
+                </div>
+            }
+            else if (_showingResults)
+            {
+                <div class="card shadow mt-4">
+                    <div class="card-body text-center">
+                        <h3 class="mb-4">Question @(_currentQuestionIndex + 1) Results</h3>
+
+                        @if (_lastAnswer != null)
+                        {
+                            @if (_lastAnswer.IsCorrect)
+                            {
+                                <div class="alert alert-success fs-4">
+                                    Correct! +@_lastAnswer.PointsAwarded points
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="alert alert-danger fs-4">
+                                    Incorrect!
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="alert alert-warning fs-4">
+                                Time's up!
+                            </div>
+                        }
+
+                        <div class="alert alert-light border fs-5">
+                            Correct answer: <strong>@((char)('A' + _currentQuestion.CorrectOptionIndex)) - @_currentQuestion.Options[_currentQuestion.CorrectOptionIndex]</strong>
+                        </div>
+
+                        <h4 class="mt-4 mb-3">Leaderboard</h4>
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Team</th>
+                                    <th class="text-end">Points</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @{int rank = 1;}
+                                @foreach (var team in _leaderboard)
+                                {
+                                    <tr class="@(team.TeamId == TeamId ? "table-primary fw-bold" : "")">
+                                        <td>@rank</td>
+                                        <td>@team.TeamName</td>
+                                        <td class="text-end">@team.TotalPoints</td>
+                                    </tr>
+                                    rank++;
+                                }
+                            </tbody>
+                        </table>
+
+                        <p class="text-muted mt-3">Waiting for next question...</p>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="card shadow mt-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>Question @(_currentQuestionIndex + 1)</span>
+                        <span class="badge @(_timeRemaining <= 5 ? "bg-danger" : "bg-warning text-dark") fs-4">
+                            @_timeRemaining s
+                        </span>
+                    </div>
+                    <div class="card-body">
+                        <h3 class="mb-4">@_currentQuestion.Text</h3>
+
+                        @if (_hasAnswered)
+                        {
+                            <div class="alert alert-info text-center">
+                                Answer submitted! Waiting for results...
+                            </div>
+                            <div class="row">
+                                @for (int i = 0; i < _currentQuestion.Options.Count; i++)
+                                {
+                                    var idx = i;
+                                    <div class="col-6 mb-3">
+                                        <div class="card h-100 @(_selectedOption == idx ? "border-primary bg-primary text-white" : "")">
+                                            <div class="card-body text-center">
+                                                <h5>@((char)('A' + idx))</h5>
+                                                <p class="mb-0">@_currentQuestion.Options[idx]</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="row">
+                                @for (int i = 0; i < _currentQuestion.Options.Count; i++)
+                                {
+                                    var idx = i;
+                                    <div class="col-6 mb-3">
+                                        <button class="btn btn-outline-primary w-100 h-100 py-4" @onclick="() => SubmitAnswer(idx)" disabled="@(_timeRemaining <= 0)">
+                                            <h4>@((char)('A' + idx))</h4>
+                                            <p class="mb-0">@_currentQuestion.Options[idx]</p>
+                                        </button>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+
+    </div>
+</div>
+
+@code {
+    [Parameter] public string GameCode { get; set; } = string.Empty;
+    [Parameter] public Guid TeamId { get; set; }
+
+    private Game? _game;
+    private List<Question> _questions = [];
+    private Question? _currentQuestion;
+    private int _currentQuestionIndex;
+    private int _timeRemaining;
+    private bool _hasAnswered;
+    private int _selectedOption = -1;
+    private Answer? _lastAnswer;
+    private bool _showingResults;
+    private List<TeamScore> _leaderboard = [];
+    private HubConnection? _hubConnection;
+    private System.Threading.Timer? _timer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _game = await GameService.GetGameByCodeAsync(GameCode);
+        if (_game == null)
+        {
+            Navigation.NavigateTo("/");
+            return;
+        }
+
+        _questions = await GameService.GetQuestionsAsync();
+
+        _hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/gamehub"))
+            .Build();
+
+        _hubConnection.On<int, Question>("QuestionStarted", async (questionIndex, question) =>
+        {
+            _currentQuestionIndex = questionIndex;
+            _currentQuestion = question;
+            _timeRemaining = question.TimeLimitSeconds;
+            _hasAnswered = false;
+            _selectedOption = -1;
+            _lastAnswer = null;
+            _showingResults = false;
+
+            _timer?.Dispose();
+            _timer = new System.Threading.Timer(async _ =>
+            {
+                _timeRemaining--;
+                if (_timeRemaining <= 0)
+                {
+                    _timer?.Dispose();
+                }
+                await InvokeAsync(StateHasChanged);
+            }, null, 1000, 1000);
+
+            await InvokeAsync(StateHasChanged);
+        });
+
+        _hubConnection.On<int, List<TeamScore>>("ShowResults", async (questionIndex, leaderboard) =>
+        {
+            _timer?.Dispose();
+            _showingResults = true;
+            _leaderboard = leaderboard;
+            await InvokeAsync(StateHasChanged);
+        });
+
+        _hubConnection.On<List<TeamScore>>("GameEnded", (finalLeaderboard) =>
+        {
+            Navigation.NavigateTo($"/game/results/{GameCode}/{TeamId}");
+        });
+
+        await _hubConnection.StartAsync();
+        await _hubConnection.SendAsync("JoinGameGroup", GameCode);
+
+        _game = await GameService.GetGameByCodeAsync(GameCode);
+        if (_game == null) return;
+
+        if (_game.CurrentQuestionIndex >= 0 && _game.CurrentQuestionIndex < _questions.Count && _game.QuestionStartedAt.HasValue)
+        {
+            _currentQuestionIndex = _game.CurrentQuestionIndex;
+            _currentQuestion = _questions[_currentQuestionIndex];
+            var elapsed = (DateTime.UtcNow - _game.QuestionStartedAt.Value).TotalSeconds;
+            _timeRemaining = Math.Max(0, _currentQuestion.TimeLimitSeconds - (int)elapsed);
+            if (_timeRemaining > 0)
+            {
+                _timer = new System.Threading.Timer(async _ =>
+                {
+                    _timeRemaining--;
+                    if (_timeRemaining <= 0)
+                    {
+                        _timer?.Dispose();
+                    }
+                    await InvokeAsync(StateHasChanged);
+                }, null, 1000, 1000);
+            }
+        }
+    }
+
+    private async Task SubmitAnswer(int optionIndex)
+    {
+        if (_hasAnswered || _currentQuestion == null) return;
+
+        _hasAnswered = true;
+        _selectedOption = optionIndex;
+
+        _lastAnswer = await GameService.SubmitAnswerAsync(_game!.Id, TeamId, _currentQuestionIndex, optionIndex, _currentQuestion);
+
+        if (_hubConnection != null)
+        {
+            await _hubConnection.SendAsync("NotifyAnswerSubmitted", GameCode, TeamId);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _timer?.Dispose();
+        if (_hubConnection != null)
+        {
+            await _hubConnection.DisposeAsync();
+        }
+    }
+}
