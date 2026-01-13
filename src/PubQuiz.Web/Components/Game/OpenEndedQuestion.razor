@@ -6,31 +6,11 @@
 {
     <div class="card">
         <div class="card-body text-center">
-            @if (AnswerStatus == AnswerStatus.Pending)
-            {
-                <div class="alert alert-info mb-0">
-                    <div class="spinner-border spinner-border-sm me-2" role="status"></div>
-                    Your answer: <strong>@SubmittedAnswer</strong>
-                    <br/>
-                    <small>Waiting for host to review...</small>
-                </div>
-            }
-            else if (AnswerStatus == AnswerStatus.Approved)
-            {
-                <div class="alert alert-success mb-0">
-                    Correct! +@PointsAwarded points
-                    <br/>
-                    Your answer: <strong>@SubmittedAnswer</strong>
-                </div>
-            }
-            else if (AnswerStatus == AnswerStatus.Rejected)
-            {
-                <div class="alert alert-danger mb-0">
-                    Incorrect!
-                    <br/>
-                    Your answer: <strong>@SubmittedAnswer</strong>
-                </div>
-            }
+            <div class="alert alert-info mb-0">
+                Your answer: <strong>@SubmittedAnswer</strong>
+                <br/>
+                <small class="text-muted">Waiting for results...</small>
+            </div>
         </div>
     </div>
 }

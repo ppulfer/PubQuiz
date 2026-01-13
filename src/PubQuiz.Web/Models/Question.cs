@@ -11,4 +11,9 @@ public class Question
     public List<string> AcceptedAnswers { get; set; } = [];
     public int TimeLimitSeconds { get; set; } = 30;
     public int MaxAttempts { get; set; } = 6;
+
+    // Estimate question fields
+    public decimal? CorrectValue { get; set; }
+    public decimal? TolerancePercent { get; set; }
+    public string? Unit { get; set; }
 }

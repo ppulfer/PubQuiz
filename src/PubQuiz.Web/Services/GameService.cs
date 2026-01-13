@@ -148,6 +148,36 @@ public class GameService(PubQuizDbContext context, ScoringService scoringService
         return answer;
     }
 
+    public async Task<Answer?> SubmitEstimateAnswerAsync(Guid gameId, Guid teamId, int questionIndex, decimal estimate, Question question)
+    {
+        var existingAnswer = await context.Answers
+            .FirstOrDefaultAsync(a => a.GameId == gameId && a.TeamId == teamId && a.QuestionIndex == questionIndex);
+        if (existingAnswer != null) return existingAnswer;
+
+        var (points, deviationPercent) = scoringService.CalculateEstimatePoints(
+            estimate,
+            question.CorrectValue ?? 0,
+            question.TolerancePercent ?? 50);
+
+        var answer = new Answer
+        {
+            Id = Guid.NewGuid(),
+            GameId = gameId,
+            TeamId = teamId,
+            QuestionIndex = questionIndex,
+            EstimateValue = estimate,
+            DeviationPercent = deviationPercent,
+            SubmittedAt = DateTime.UtcNow,
+            Status = AnswerStatus.AutoScored,
+            IsCorrect = points > 0,
+            PointsAwarded = points
+        };
+
+        context.Answers.Add(answer);
+        await context.SaveChangesAsync();
+        return answer;
+    }
+
     public async Task<List<Answer>> GetPendingAnswersAsync(Guid gameId, int questionIndex)
     {
         return await context.Answers

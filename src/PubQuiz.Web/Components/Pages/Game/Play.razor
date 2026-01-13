@@ -27,7 +27,26 @@
 
                         @if (_lastAnswer != null)
                         {
-                            @if (_lastAnswer.IsCorrect)
+                            @if (_currentQuestion.Type == QuestionType.Estimate)
+                            {
+                                @if (_lastAnswer.PointsAwarded > 0)
+                                {
+                                    <div class="alert alert-success fs-4">
+                                        +@_lastAnswer.PointsAwarded points
+                                        <br/>
+                                        <small>Your guess: @_lastAnswer.EstimateValue @_currentQuestion.Unit (@_lastAnswer.DeviationPercent?.ToString("F1")% off)</small>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <div class="alert alert-danger fs-4">
+                                        0 points
+                                        <br/>
+                                        <small>Your guess: @_lastAnswer.EstimateValue @_currentQuestion.Unit (too far off)</small>
+                                    </div>
+                                }
+                            }
+                            else if (_lastAnswer.IsCorrect)
                             {
                                 <div class="alert alert-success fs-4">
                                     Correct! +@_lastAnswer.PointsAwarded points
@@ -53,10 +72,22 @@
                                 Correct answer: <strong>@((char)('A' + _currentQuestion.CorrectOptionIndex)) - @_currentQuestion.Options[_currentQuestion.CorrectOptionIndex]</strong>
                             </div>
                         }
-                        else if (_currentQuestion.Type == QuestionType.OpenEnded || _currentQuestion.Type == QuestionType.Wordle)
+                        else if (_currentQuestion.Type == QuestionType.OpenEnded)
+                        {
+                            <div class="alert alert-light border fs-5">
+                                Accepted answers: <strong>@string.Join(", ", _currentQuestion.AcceptedAnswers)</strong>
+                            </div>
+                        }
+                        else if (_currentQuestion.Type == QuestionType.Wordle)
                         {
                             <div class="alert alert-light border fs-5">
                                 Correct answer: <strong>@_currentQuestion.CorrectAnswer</strong>
+                            </div>
+                        }
+                        else if (_currentQuestion.Type == QuestionType.Estimate)
+                        {
+                            <div class="alert alert-light border fs-5">
+                                Correct answer: <strong>@_currentQuestion.CorrectValue @_currentQuestion.Unit</strong>
                             </div>
                         }
 
@@ -104,33 +135,44 @@
                         {
                             case QuestionType.MultipleChoice:
                                 <MultipleChoiceQuestion
-                                    Question="_currentQuestion"
-                                    TimeRemaining="_timeRemaining"
-                                    HasAnswered="_hasAnswered"
-                                    SelectedOption="_selectedOption"
+                                    Question="@_currentQuestion"
+                                    TimeRemaining="@_timeRemaining"
+                                    HasAnswered="@_hasAnswered"
+                                    SelectedOption="@_selectedOption"
                                     OnAnswerSelected="SubmitMultipleChoiceAnswer" />
                                 break;
 
                             case QuestionType.OpenEnded:
                                 <OpenEndedQuestion
-                                    Question="_currentQuestion"
-                                    TimeRemaining="_timeRemaining"
-                                    HasAnswered="_hasAnswered"
-                                    SubmittedAnswer="_textAnswer"
-                                    AnswerStatus="_answerStatus"
-                                    PointsAwarded="_lastAnswer?.PointsAwarded ?? 0"
+                                    Question="@_currentQuestion"
+                                    TimeRemaining="@_timeRemaining"
+                                    HasAnswered="@_hasAnswered"
+                                    SubmittedAnswer="@_textAnswer"
+                                    AnswerStatus="@_answerStatus"
+                                    PointsAwarded="@(_lastAnswer?.PointsAwarded ?? 0)"
                                     OnAnswerSubmitted="SubmitTextAnswer" />
                                 break;
 
                             case QuestionType.Wordle:
                                 <WordleQuestion
-                                    Question="_currentQuestion"
-                                    Attempts="_wordleAttempts"
-                                    AttemptsUsed="_wordleAttemptsUsed"
-                                    IsSolved="_wordleSolved"
-                                    IsOutOfAttempts="_wordleOutOfAttempts"
-                                    PointsAwarded="_lastAnswer?.PointsAwarded ?? 0"
+                                    Question="@_currentQuestion"
+                                    Attempts="@_wordleAttempts"
+                                    AttemptsUsed="@_wordleAttemptsUsed"
+                                    IsSolved="@_wordleSolved"
+                                    IsOutOfAttempts="@_wordleOutOfAttempts"
+                                    PointsAwarded="@(_lastAnswer?.PointsAwarded ?? 0)"
                                     OnGuessSubmitted="SubmitWordleGuess" />
+                                break;
+
+                            case QuestionType.Estimate:
+                                <EstimateQuestion
+                                    Question="@_currentQuestion"
+                                    TimeRemaining="@_timeRemaining"
+                                    HasAnswered="@_hasAnswered"
+                                    SubmittedValue="@_estimateValue"
+                                    DeviationPercent="@_estimateDeviation"
+                                    PointsAwarded="@(_lastAnswer?.PointsAwarded ?? 0)"
+                                    OnAnswerSubmitted="SubmitEstimateAnswer" />
                                 break;
                         }
                     </div>
@@ -163,6 +205,8 @@
     private int _wordleAttemptsUsed;
     private bool _wordleSolved;
     private bool _wordleOutOfAttempts;
+    private decimal _estimateValue;
+    private decimal _estimateDeviation;
 
     protected override async Task OnInitializedAsync()
     {
@@ -287,6 +331,7 @@
         QuestionType.MultipleChoice => "Multiple Choice",
         QuestionType.OpenEnded => "Open Answer",
         QuestionType.Wordle => "Wordle",
+        QuestionType.Estimate => "Estimate",
         _ => "Question"
     };
 
@@ -350,6 +395,22 @@
         }
 
         StateHasChanged();
+    }
+
+    private async Task SubmitEstimateAnswer(decimal estimate)
+    {
+        if (_hasAnswered || _currentQuestion == null) return;
+
+        _hasAnswered = true;
+        _estimateValue = estimate;
+
+        _lastAnswer = await GameService.SubmitEstimateAnswerAsync(_game!.Id, TeamId, _currentQuestionIndex, estimate, _currentQuestion);
+        _estimateDeviation = _lastAnswer?.DeviationPercent ?? 100;
+
+        if (_hubConnection != null)
+        {
+            await _hubConnection.SendAsync("NotifyAnswerSubmitted", GameCode, TeamId);
+        }
     }
 
     public async ValueTask DisposeAsync()

@@ -439,8 +439,9 @@ else
         return _currentQuestion.Type switch
         {
             QuestionType.MultipleChoice => _timeRemaining <= 0 || _answeredTeams.Count == _game!.Teams.Count,
-            QuestionType.OpenEnded => _openEndedAnswers.All(a => a.Status != AnswerStatus.Pending) && _openEndedAnswers.Count > 0,
+            QuestionType.OpenEnded => _timeRemaining <= 0 || _answeredTeams.Count == _game!.Teams.Count,
             QuestionType.Wordle => _wordleProgress.Count == _game!.Teams.Count && _wordleProgress.All(p => p.Solved || p.OutOfAttempts),
+            QuestionType.Estimate => _timeRemaining <= 0 || _answeredTeams.Count == _game!.Teams.Count,
             _ => false
         };
     }
@@ -452,8 +453,9 @@ else
         return _currentQuestion.Type switch
         {
             QuestionType.MultipleChoice when _answeredTeams.Count == _game!.Teams.Count && _timeRemaining > 0 => "(All answered)",
-            QuestionType.OpenEnded => "(All reviewed)",
+            QuestionType.OpenEnded when _answeredTeams.Count == _game!.Teams.Count && _timeRemaining > 0 => "(All answered)",
             QuestionType.Wordle => "(All finished)",
+            QuestionType.Estimate when _answeredTeams.Count == _game!.Teams.Count && _timeRemaining > 0 => "(All answered)",
             _ => ""
         };
     }

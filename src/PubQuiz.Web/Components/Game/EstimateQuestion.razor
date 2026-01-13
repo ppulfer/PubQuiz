@@ -1,0 +1,57 @@
+@using PubQuiz.Web.Models
+
+<h3 class="mb-4">@Question.Text</h3>
+
+@if (HasAnswered)
+{
+    <div class="card">
+        <div class="card-body text-center">
+            <div class="alert alert-info mb-0">
+                Your guess: <strong>@SubmittedValue @Question.Unit</strong>
+                <br/>
+                <small class="text-muted">Waiting for results...</small>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="card">
+        <div class="card-body">
+            <div class="mb-3">
+                <div class="input-group input-group-lg">
+                    <input type="number" class="form-control text-center" @bind="_estimate" @bind:event="oninput"
+                           placeholder="Enter your guess..." disabled="@(TimeRemaining <= 0)" />
+                    @if (!string.IsNullOrEmpty(Question.Unit))
+                    {
+                        <span class="input-group-text">@Question.Unit</span>
+                    }
+                </div>
+            </div>
+            <button class="btn btn-primary btn-lg w-100" @onclick="SubmitAnswer"
+                    disabled="@(_estimate == null || TimeRemaining <= 0)">
+                Submit Guess
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public Question Question { get; set; } = null!;
+    [Parameter] public int TimeRemaining { get; set; }
+    [Parameter] public bool HasAnswered { get; set; }
+    [Parameter] public decimal SubmittedValue { get; set; }
+    [Parameter] public decimal DeviationPercent { get; set; }
+    [Parameter] public int PointsAwarded { get; set; }
+    [Parameter] public EventCallback<decimal> OnAnswerSubmitted { get; set; }
+
+    private decimal? _estimate;
+
+    private async Task SubmitAnswer()
+    {
+        if (_estimate.HasValue)
+        {
+            await OnAnswerSubmitted.InvokeAsync(_estimate.Value);
+        }
+    }
+}

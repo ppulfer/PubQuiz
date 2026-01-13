@@ -8,6 +8,8 @@ public class Answer
     public int QuestionIndex { get; set; }
     public int SelectedOptionIndex { get; set; }
     public string? TextAnswer { get; set; }
+    public decimal? EstimateValue { get; set; }
+    public decimal? DeviationPercent { get; set; }
     public AnswerStatus Status { get; set; } = AnswerStatus.AutoScored;
     public int? AttemptsUsed { get; set; }
     public DateTime SubmittedAt { get; set; } = DateTime.UtcNow;

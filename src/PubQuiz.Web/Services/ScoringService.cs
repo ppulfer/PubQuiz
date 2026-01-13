@@ -29,4 +29,23 @@ public class ScoringService
         var pointsPerAttempt = (BasePoints - MinimumPoints) / (maxAttempts - 1);
         return BasePoints - ((attemptsUsed - 1) * pointsPerAttempt);
     }
+
+    public (int points, decimal deviationPercent) CalculateEstimatePoints(decimal guess, decimal correctValue, decimal tolerancePercent)
+    {
+        if (correctValue == 0)
+            return (0, 100);
+
+        var deviation = Math.Abs(guess - correctValue);
+        var deviationPercent = (deviation / Math.Abs(correctValue)) * 100;
+
+        if (deviationPercent == 0)
+            return (BasePoints, 0);
+
+        if (deviationPercent >= tolerancePercent)
+            return (0, deviationPercent);
+
+        var ratio = 1 - (deviationPercent / tolerancePercent);
+        var points = (int)(BasePoints * ratio);
+        return (Math.Max(0, points), deviationPercent);
+    }
 }

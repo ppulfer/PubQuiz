@@ -122,6 +122,26 @@ public static class SeedData
                 Options = ["186", "206", "226", "246"],
                 CorrectOptionIndex = 1,
                 TimeLimitSeconds = 20
+            },
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Type = QuestionType.Estimate,
+                Text = "How many meters above sea level is Zurich Bellevue?",
+                CorrectValue = 408,
+                TolerancePercent = 50,
+                Unit = "m",
+                TimeLimitSeconds = 30
+            },
+            new()
+            {
+                Id = Guid.NewGuid(),
+                Type = QuestionType.Estimate,
+                Text = "How many kilometers is the distance from Earth to the Moon?",
+                CorrectValue = 384400,
+                TolerancePercent = 30,
+                Unit = "km",
+                TimeLimitSeconds = 30
             }
         };
 

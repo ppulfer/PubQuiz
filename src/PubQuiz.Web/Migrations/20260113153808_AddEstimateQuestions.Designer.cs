@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using PubQuiz.Web.Data;
@@ -12,9 +13,11 @@ using PubQuiz.Web.Data;
 namespace PubQuiz.Web.Migrations
 {
     [DbContext(typeof(PubQuizDbContext))]
-    partial class PubQuizDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260113153808_AddEstimateQuestions")]
+    partial class AddEstimateQuestions
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
