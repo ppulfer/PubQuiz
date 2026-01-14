@@ -17,7 +17,7 @@ public class PubQuizDbContext(DbContextOptions<PubQuizDbContext> options) : DbCo
         {
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.Code).IsUnique();
-            entity.Property(e => e.Code).HasMaxLength(6);
+            entity.Property(e => e.Code).HasMaxLength(10);
             entity.Property(e => e.HostPasswordHash).HasMaxLength(100);
         });
 
@@ -36,7 +36,10 @@ public class PubQuizDbContext(DbContextOptions<PubQuizDbContext> options) : DbCo
             entity.HasKey(e => e.Id);
             entity.Property(e => e.Text).HasMaxLength(500);
             entity.Property(e => e.Options).HasColumnType("jsonb");
+            entity.Property(e => e.AcceptedAnswers).HasColumnType("jsonb");
             entity.Property(e => e.CorrectAnswer).HasMaxLength(100);
+            entity.Property(e => e.Unit).HasMaxLength(50);
+            entity.Property(e => e.ImageUrls).HasColumnType("jsonb");
         });
 
         modelBuilder.Entity<Answer>(entity =>

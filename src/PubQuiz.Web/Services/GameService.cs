@@ -65,7 +65,7 @@ public class GameService(PubQuizDbContext context, ScoringService scoringService
 
     public async Task<List<Question>> GetQuestionsAsync()
     {
-        return await context.Questions.OrderBy(q => q.Id).ToListAsync();
+        return await context.Questions.OrderBy(q => q.SortOrder).ThenBy(q => q.Id).ToListAsync();
     }
 
     public async Task StartQuestionAsync(Guid gameId, int questionIndex)
@@ -170,6 +170,33 @@ public class GameService(PubQuizDbContext context, ScoringService scoringService
             SubmittedAt = DateTime.UtcNow,
             Status = AnswerStatus.AutoScored,
             IsCorrect = points > 0,
+            PointsAwarded = points
+        };
+
+        context.Answers.Add(answer);
+        await context.SaveChangesAsync();
+        return answer;
+    }
+
+    public async Task<Answer?> SubmitRealOrFakeAnswerAsync(Guid gameId, Guid teamId, int questionIndex, int selectedImageIndex, Question question)
+    {
+        var existingAnswer = await context.Answers
+            .FirstOrDefaultAsync(a => a.GameId == gameId && a.TeamId == teamId && a.QuestionIndex == questionIndex);
+        if (existingAnswer != null) return existingAnswer;
+
+        var isCorrect = selectedImageIndex == question.CorrectImageIndex;
+        var points = isCorrect ? 10 : 0;
+
+        var answer = new Answer
+        {
+            Id = Guid.NewGuid(),
+            GameId = gameId,
+            TeamId = teamId,
+            QuestionIndex = questionIndex,
+            SelectedOptionIndex = selectedImageIndex,
+            SubmittedAt = DateTime.UtcNow,
+            Status = AnswerStatus.AutoScored,
+            IsCorrect = isCorrect,
             PointsAwarded = points
         };
 

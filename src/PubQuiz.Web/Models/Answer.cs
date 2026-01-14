@@ -9,6 +9,7 @@ public class Answer
     public int SelectedOptionIndex { get; set; }
     public string? TextAnswer { get; set; }
     public decimal? EstimateValue { get; set; }
+    public bool? GuessedReal { get; set; }
     public decimal? DeviationPercent { get; set; }
     public AnswerStatus Status { get; set; } = AnswerStatus.AutoScored;
     public int? AttemptsUsed { get; set; }

@@ -3,6 +3,7 @@ namespace PubQuiz.Web.Models;
 public class Question
 {
     public Guid Id { get; set; }
+    public int SortOrder { get; set; }
     public QuestionType Type { get; set; } = QuestionType.MultipleChoice;
     public string Text { get; set; } = string.Empty;
     public List<string> Options { get; set; } = [];
@@ -16,4 +17,8 @@ public class Question
     public decimal? CorrectValue { get; set; }
     public decimal? TolerancePercent { get; set; }
     public string? Unit { get; set; }
+
+    // Find the Real Image question fields
+    public List<string> ImageUrls { get; set; } = [];
+    public int CorrectImageIndex { get; set; }
 }

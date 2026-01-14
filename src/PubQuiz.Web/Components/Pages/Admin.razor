@@ -6,10 +6,39 @@
 
 <PageTitle>Admin - Pause-Quiz</PageTitle>
 
+@if (!_isAuthenticated)
+{
+    <div class="container">
+        <div class="row justify-content-center mt-5">
+            <div class="col-md-4">
+                <div class="card shadow">
+                    <div class="card-body">
+                        <h4 class="card-title text-center mb-4">Admin Login</h4>
+                        <EditForm Model="@_loginModel" OnValidSubmit="Login">
+                            <div class="mb-3">
+                                <input type="password" class="form-control" placeholder="Password" @bind="_loginModel.Password" />
+                            </div>
+                            @if (_loginError)
+                            {
+                                <div class="alert alert-danger py-2">Invalid password</div>
+                            }
+                            <button type="submit" class="btn btn-primary w-100">Login</button>
+                        </EditForm>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+else
+{
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>Game Administration</h2>
         <div class="d-flex gap-2 align-items-center">
+            <a href="/host/login" class="btn btn-success">
+                + New Game
+            </a>
             <div class="form-check form-switch">
                 <input class="form-check-input" type="checkbox" id="autoRefresh" checked="@_autoRefresh" @onchange="ToggleAutoRefresh">
                 <label class="form-check-label" for="autoRefresh">Auto-refresh</label>
@@ -112,8 +141,32 @@
         </div>
     }
 </div>
+}
 
 @code {
+    private bool _isAuthenticated;
+    private bool _loginError;
+    private LoginModel _loginModel = new();
+    private const string AdminPassword = "globi";
+
+    private class LoginModel
+    {
+        public string Password { get; set; } = "";
+    }
+
+    private void Login()
+    {
+        if (_loginModel.Password == AdminPassword)
+        {
+            _isAuthenticated = true;
+            _loginError = false;
+        }
+        else
+        {
+            _loginError = true;
+        }
+    }
+
     private List<GameSummary> _allGames = [];
     private List<GameSummary> _activeGames = [];
     private bool _isLoading = true;

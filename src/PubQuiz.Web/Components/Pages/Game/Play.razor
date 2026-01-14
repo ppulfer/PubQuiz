@@ -90,6 +90,12 @@
                                 Correct answer: <strong>@_currentQuestion.CorrectValue @_currentQuestion.Unit</strong>
                             </div>
                         }
+                        else if (_currentQuestion.Type == QuestionType.RealOrFake)
+                        {
+                            <div class="alert alert-light border fs-5">
+                                The real image was: <strong>@((char)('A' + _currentQuestion.CorrectImageIndex))</strong>
+                            </div>
+                        }
 
                         <h4 class="mt-4 mb-3">Leaderboard</h4>
                         <table class="table">
@@ -174,6 +180,15 @@
                                     PointsAwarded="@(_lastAnswer?.PointsAwarded ?? 0)"
                                     OnAnswerSubmitted="SubmitEstimateAnswer" />
                                 break;
+
+                            case QuestionType.RealOrFake:
+                                <RealOrFakeQuestion
+                                    Question="@_currentQuestion"
+                                    TimeRemaining="@_timeRemaining"
+                                    HasAnswered="@_hasAnswered"
+                                    SelectedIndex="@_selectedImageIndex"
+                                    OnAnswerSubmitted="SubmitRealOrFakeAnswer" />
+                                break;
                         }
                     </div>
                 </div>
@@ -207,6 +222,7 @@
     private bool _wordleOutOfAttempts;
     private decimal _estimateValue;
     private decimal _estimateDeviation;
+    private int _selectedImageIndex = -1;
 
     protected override async Task OnInitializedAsync()
     {
@@ -332,6 +348,7 @@
         QuestionType.OpenEnded => "Open Answer",
         QuestionType.Wordle => "Wordle",
         QuestionType.Estimate => "Estimate",
+        QuestionType.RealOrFake => "Real or Fake",
         _ => "Question"
     };
 
@@ -406,6 +423,21 @@
 
         _lastAnswer = await GameService.SubmitEstimateAnswerAsync(_game!.Id, TeamId, _currentQuestionIndex, estimate, _currentQuestion);
         _estimateDeviation = _lastAnswer?.DeviationPercent ?? 100;
+
+        if (_hubConnection != null)
+        {
+            await _hubConnection.SendAsync("NotifyAnswerSubmitted", GameCode, TeamId);
+        }
+    }
+
+    private async Task SubmitRealOrFakeAnswer(int selectedIndex)
+    {
+        if (_hasAnswered || _currentQuestion == null) return;
+
+        _hasAnswered = true;
+        _selectedImageIndex = selectedIndex;
+
+        _lastAnswer = await GameService.SubmitRealOrFakeAnswerAsync(_game!.Id, TeamId, _currentQuestionIndex, selectedIndex, _currentQuestion);
 
         if (_hubConnection != null)
         {

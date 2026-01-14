@@ -442,6 +442,7 @@ else
             QuestionType.OpenEnded => _timeRemaining <= 0 || _answeredTeams.Count == _game!.Teams.Count,
             QuestionType.Wordle => _wordleProgress.Count == _game!.Teams.Count && _wordleProgress.All(p => p.Solved || p.OutOfAttempts),
             QuestionType.Estimate => _timeRemaining <= 0 || _answeredTeams.Count == _game!.Teams.Count,
+            QuestionType.RealOrFake => _timeRemaining <= 0 || _answeredTeams.Count == _game!.Teams.Count,
             _ => false
         };
     }
@@ -456,6 +457,7 @@ else
             QuestionType.OpenEnded when _answeredTeams.Count == _game!.Teams.Count && _timeRemaining > 0 => "(All answered)",
             QuestionType.Wordle => "(All finished)",
             QuestionType.Estimate when _answeredTeams.Count == _game!.Teams.Count && _timeRemaining > 0 => "(All answered)",
+            QuestionType.RealOrFake when _answeredTeams.Count == _game!.Teams.Count && _timeRemaining > 0 => "(All answered)",
             _ => ""
         };
     }
