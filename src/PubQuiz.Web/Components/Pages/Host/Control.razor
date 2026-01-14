@@ -498,7 +498,7 @@ else
             QuestionType.Wordle => _wordleProgress.Count == _game!.Teams.Count && _wordleProgress.All(p => p.Solved || p.OutOfAttempts),
             QuestionType.Estimate => _timeRemaining <= 0 || _answeredTeams.Count == _game!.Teams.Count,
             QuestionType.RealOrFake => _timeRemaining <= 0 || _answeredTeams.Count == _game!.Teams.Count,
-            QuestionType.DinoRun => _timeRemaining <= 0,
+            QuestionType.DinoRun => true,
             _ => false
         };
     }
@@ -515,6 +515,7 @@ else
             QuestionType.Estimate when _answeredTeams.Count == _game!.Teams.Count && _timeRemaining > 0 => "(All answered)",
             QuestionType.RealOrFake when _answeredTeams.Count == _game!.Teams.Count && _timeRemaining > 0 => "(All answered)",
             QuestionType.DinoRun when _timeRemaining <= 0 => "(Time's up)",
+            QuestionType.DinoRun when _timeRemaining > 0 => $"({_timeRemaining}s left)",
             _ => ""
         };
     }
