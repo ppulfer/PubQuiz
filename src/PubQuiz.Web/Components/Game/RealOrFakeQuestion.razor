@@ -1,0 +1,59 @@
+@using PubQuiz.Web.Models
+
+<h3 class="mb-4">@Question.Text</h3>
+
+<div class="mb-4">
+    @for (int i = 0; i < Question.ImageUrls.Count; i++)
+    {
+        var index = i;
+        var isSelected = HasAnswered && SelectedIndex == index;
+        <div class="card mb-3 @(isSelected ? "border-primary border-3" : "")">
+            <div class="card-header text-center py-2">
+                <span class="badge @(isSelected ? "bg-primary" : "bg-secondary") fs-5">@((char)('A' + index))</span>
+            </div>
+            <img src="@Question.ImageUrls[index]" alt="Option @((char)('A' + index))" class="card-img-bottom img-fluid" />
+        </div>
+    }
+</div>
+
+@if (HasAnswered)
+{
+    <div class="alert alert-info text-center">
+        Your selection: <strong>@((char)('A' + SelectedIndex))</strong>
+        <br/>
+        <small class="text-muted">Waiting for results...</small>
+    </div>
+}
+else
+{
+    <div class="card">
+        <div class="card-body">
+            <p class="text-center mb-3">Which image is real?</p>
+            <div class="d-flex justify-content-center gap-3">
+                @for (int i = 0; i < Question.ImageUrls.Count; i++)
+                {
+                    var index = i;
+                    <button class="btn btn-primary btn-lg px-4"
+                            @onclick="() => SubmitAnswer(index)"
+                            disabled="@(TimeRemaining <= 0)">
+                        @((char)('A' + index))
+                    </button>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public Question Question { get; set; } = null!;
+    [Parameter] public int TimeRemaining { get; set; }
+    [Parameter] public bool HasAnswered { get; set; }
+    [Parameter] public int SelectedIndex { get; set; }
+    [Parameter] public EventCallback<int> OnAnswerSubmitted { get; set; }
+
+    private async Task SubmitAnswer(int index)
+    {
+        if (HasAnswered || TimeRemaining <= 0) return;
+        await OnAnswerSubmitted.InvokeAsync(index);
+    }
+}
