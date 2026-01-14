@@ -140,6 +140,38 @@ else
                                         TotalTeams="_game.Teams.Count"
                                         MaxAttempts="_currentQuestion.MaxAttempts" />
                                 }
+                                else if (_showingQuestion && _currentQuestion.Type == QuestionType.DinoRun)
+                                {
+                                    <div class="card">
+                                        <div class="card-header">Dino Run Scores</div>
+                                        <div class="card-body">
+                                            @if (_dinoProgress.Any())
+                                            {
+                                                <table class="table table-sm mb-0">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Team</th>
+                                                            <th class="text-end">Best Score</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        @foreach (var progress in _dinoProgress.OrderByDescending(p => p.Score))
+                                                        {
+                                                            <tr>
+                                                                <td>@progress.TeamName</td>
+                                                                <td class="text-end fw-bold">@progress.Score</td>
+                                                            </tr>
+                                                        }
+                                                    </tbody>
+                                                </table>
+                                            }
+                                            else
+                                            {
+                                                <p class="text-muted mb-0">Waiting for scores...</p>
+                                            }
+                                        </div>
+                                    </div>
+                                }
 
                                 <div class="mt-3 text-center">
                                     @if (!_showingQuestion)
@@ -238,6 +270,7 @@ else
 
     private List<Answer> _openEndedAnswers = [];
     private List<WordleProgress> _wordleProgress = [];
+    private List<DinoProgress> _dinoProgress = [];
 
     protected override async Task OnInitializedAsync()
     {
@@ -309,6 +342,27 @@ else
             if (solved || outOfAttempts)
             {
                 _answeredTeams.Add(teamId);
+            }
+
+            await InvokeAsync(StateHasChanged);
+        });
+
+        _hubConnection.On<Guid, int>("DinoScoreUpdated", async (teamId, score) =>
+        {
+            var existing = _dinoProgress.FirstOrDefault(p => p.TeamId == teamId);
+            if (existing != null)
+            {
+                if (score > existing.Score) existing.Score = score;
+            }
+            else
+            {
+                var team = _game!.Teams.FirstOrDefault(t => t.Id == teamId);
+                _dinoProgress.Add(new DinoProgress
+                {
+                    TeamId = teamId,
+                    TeamName = team?.Name ?? "Unknown",
+                    Score = score
+                });
             }
 
             await InvokeAsync(StateHasChanged);
@@ -389,6 +443,7 @@ else
         _answeredTeams.Clear();
         _openEndedAnswers = [];
         _wordleProgress = [];
+        _dinoProgress = [];
         _timeRemaining = _currentQuestion!.TimeLimitSeconds;
 
         await GameService.ShowQuestionToTeamsAsync(_game!.Id);
@@ -443,6 +498,7 @@ else
             QuestionType.Wordle => _wordleProgress.Count == _game!.Teams.Count && _wordleProgress.All(p => p.Solved || p.OutOfAttempts),
             QuestionType.Estimate => _timeRemaining <= 0 || _answeredTeams.Count == _game!.Teams.Count,
             QuestionType.RealOrFake => _timeRemaining <= 0 || _answeredTeams.Count == _game!.Teams.Count,
+            QuestionType.DinoRun => _timeRemaining <= 0,
             _ => false
         };
     }
@@ -458,6 +514,7 @@ else
             QuestionType.Wordle => "(All finished)",
             QuestionType.Estimate when _answeredTeams.Count == _game!.Teams.Count && _timeRemaining > 0 => "(All answered)",
             QuestionType.RealOrFake when _answeredTeams.Count == _game!.Teams.Count && _timeRemaining > 0 => "(All answered)",
+            QuestionType.DinoRun when _timeRemaining <= 0 => "(Time's up)",
             _ => ""
         };
     }
@@ -467,6 +524,12 @@ else
         _timer?.Dispose();
         _showingQuestion = false;
         _showingResults = true;
+
+        if (_currentQuestion?.Type == QuestionType.DinoRun)
+        {
+            await GameService.CalculateDinoPointsAsync(_game!.Id, _game.CurrentQuestionIndex);
+        }
+
         _leaderboard = await GameService.GetLeaderboardAsync(_game!.Id);
         await HubContext.Clients.Group(GameCode).SendAsync("ShowResults", _game.CurrentQuestionIndex, _leaderboard);
     }
@@ -480,6 +543,7 @@ else
         _answeredTeams.Clear();
         _openEndedAnswers = [];
         _wordleProgress = [];
+        _dinoProgress = [];
         await GameService.StartQuestionAsync(_game.Id, _game.CurrentQuestionIndex);
         _game = await GameService.GetGameByIdAsync(_game.Id);
     }
@@ -498,6 +562,9 @@ else
         QuestionType.MultipleChoice => "Multiple Choice",
         QuestionType.OpenEnded => "Open Answer",
         QuestionType.Wordle => "Wordle",
+        QuestionType.Estimate => "Estimate",
+        QuestionType.RealOrFake => "Find the Real",
+        QuestionType.DinoRun => "Dino Run",
         _ => "Question"
     };
 

@@ -34,6 +34,9 @@ namespace PubQuiz.Web.Migrations
                     b.Property<decimal?>("DeviationPercent")
                         .HasColumnType("numeric");
 
+                    b.Property<int?>("DinoScore")
+                        .HasColumnType("integer");
+
                     b.Property<decimal?>("EstimateValue")
                         .HasColumnType("numeric");
 

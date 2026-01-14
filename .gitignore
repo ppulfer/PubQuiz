@@ -35,4 +35,5 @@ appsettings.*.json
 *.db-shm
 *.db-wal
 
+*.zip
 publish/

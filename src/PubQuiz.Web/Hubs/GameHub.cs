@@ -46,6 +46,11 @@ public class GameHub : Hub
         await Clients.Group(gameCode).SendAsync("WordleProgress", teamId, attemptsUsed, solved, outOfAttempts);
     }
 
+    public async Task NotifyDinoScore(string gameCode, Guid teamId, int score)
+    {
+        await Clients.Group(gameCode).SendAsync("DinoScoreUpdated", teamId, score);
+    }
+
     public async Task ShowResults(string gameCode, int questionIndex, List<TeamScore> leaderboard)
     {
         await Clients.Group(gameCode).SendAsync("ShowResults", questionIndex, leaderboard);

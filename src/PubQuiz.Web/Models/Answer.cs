@@ -11,6 +11,7 @@ public class Answer
     public decimal? EstimateValue { get; set; }
     public bool? GuessedReal { get; set; }
     public decimal? DeviationPercent { get; set; }
+    public int? DinoScore { get; set; }
     public AnswerStatus Status { get; set; } = AnswerStatus.AutoScored;
     public int? AttemptsUsed { get; set; }
     public DateTime SubmittedAt { get; set; } = DateTime.UtcNow;

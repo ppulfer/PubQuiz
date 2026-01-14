@@ -26,6 +26,17 @@ public static class SeedData
                 Options = ["Captain", "Navigator", "Steersman", "Shipbuilder"],
                 CorrectOptionIndex = 2,
                 TimeLimitSeconds = 120
+                
+            },
+            new()
+            {
+                Id = Guid.NewGuid(),
+                SortOrder = 2,
+                Type = QuestionType.MultipleChoice,
+                Text = "How many employess according to Rebekka have we hired in 2025?",
+                Options = ["< 1000", "1000-1200", "1200-1400", "> 1600"],
+                CorrectOptionIndex = 3,
+                TimeLimitSeconds = 120
             },
             new()
             {
@@ -44,6 +55,36 @@ public static class SeedData
                 Type = QuestionType.RealOrFake,
                 Text = "Which Hero is the real one?",
                 ImageUrls = ["/images/realorfake/eigen_1.png", "/images/realorfake/eigen_2.png", "/images/realorfake/eigen_3.png", "/images/realorfake/eigen_4.png"],
+                CorrectImageIndex = 0,
+                TimeLimitSeconds = 60
+            },
+            new()
+            {
+                Id = Guid.NewGuid(),
+                SortOrder = 3,
+                Type = QuestionType.RealOrFake,
+                Text = "Which Hero is the real one?",
+                ImageUrls = ["/images/realorfake/fire_4.png", "/images/realorfake/fire_2.png", "/images/realorfake/fire_3.png", "/images/realorfake/fire_1.png"],
+                CorrectImageIndex = 3,
+                TimeLimitSeconds = 60
+            },
+            new()
+            {
+                Id = Guid.NewGuid(),
+                SortOrder = 3,
+                Type = QuestionType.RealOrFake,
+                Text = "Which Hero is the real one?",
+                ImageUrls = ["/images/realorfake/pirat_1.png", "/images/realorfake/pirat_2.png", "/images/realorfake/pirat_3.png", "/images/realorfake/pirat_4.png"],
+                CorrectImageIndex = 0,
+                TimeLimitSeconds = 60
+            },
+            new()
+            {
+                Id = Guid.NewGuid(),
+                SortOrder = 3,
+                Type = QuestionType.RealOrFake,
+                Text = "Which Hero is the real one?",
+                ImageUrls = ["/images/realorfake/koop_1.png", "/images/realorfake/koop_2.png", "/images/realorfake/koop_3.png", "/images/realorfake/koop_4.png"],
                 CorrectImageIndex = 0,
                 TimeLimitSeconds = 60
             },
@@ -71,11 +112,9 @@ public static class SeedData
             {
                 Id = Guid.NewGuid(),
                 SortOrder = 6,
-                Type = QuestionType.MultipleChoice,
-                Text = "How many bones are in the adult human body?",
-                Options = ["186", "206", "226", "246"],
-                CorrectOptionIndex = 1,
-                TimeLimitSeconds = 60
+                Type = QuestionType.DinoRun,
+                Text = "Turtle Run - Get the highest score!",
+                TimeLimitSeconds = 20
             },
         };
 

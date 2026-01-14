@@ -6,5 +6,6 @@ public enum QuestionType
     OpenEnded = 1,
     Wordle = 2,
     Estimate = 3,
-    RealOrFake = 4
+    RealOrFake = 4,
+    DinoRun = 5
 }

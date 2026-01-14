@@ -205,6 +205,60 @@ public class GameService(PubQuizDbContext context, ScoringService scoringService
         return answer;
     }
 
+    public async Task<Answer?> SubmitDinoScoreAsync(Guid gameId, Guid teamId, int questionIndex, int score)
+    {
+        var existingAnswer = await context.Answers
+            .FirstOrDefaultAsync(a => a.GameId == gameId && a.TeamId == teamId && a.QuestionIndex == questionIndex);
+
+        if (existingAnswer != null)
+        {
+            if (score > (existingAnswer.DinoScore ?? 0))
+            {
+                existingAnswer.DinoScore = score;
+                await context.SaveChangesAsync();
+            }
+            return existingAnswer;
+        }
+
+        var answer = new Answer
+        {
+            Id = Guid.NewGuid(),
+            GameId = gameId,
+            TeamId = teamId,
+            QuestionIndex = questionIndex,
+            DinoScore = score,
+            SubmittedAt = DateTime.UtcNow,
+            Status = AnswerStatus.AutoScored,
+            IsCorrect = false,
+            PointsAwarded = 0
+        };
+
+        context.Answers.Add(answer);
+        await context.SaveChangesAsync();
+        return answer;
+    }
+
+    public async Task CalculateDinoPointsAsync(Guid gameId, int questionIndex)
+    {
+        var answers = await context.Answers
+            .Where(a => a.GameId == gameId && a.QuestionIndex == questionIndex && a.DinoScore.HasValue)
+            .ToListAsync();
+
+        if (!answers.Any()) return;
+
+        var maxScore = answers.Max(a => a.DinoScore ?? 0);
+        if (maxScore == 0) return;
+
+        foreach (var answer in answers)
+        {
+            var ratio = (decimal)(answer.DinoScore ?? 0) / maxScore;
+            answer.PointsAwarded = (int)Math.Round(ratio * 10);
+            answer.IsCorrect = answer.DinoScore == maxScore;
+        }
+
+        await context.SaveChangesAsync();
+    }
+
     public async Task<List<Answer>> GetPendingAnswersAsync(Guid gameId, int questionIndex)
     {
         return await context.Answers

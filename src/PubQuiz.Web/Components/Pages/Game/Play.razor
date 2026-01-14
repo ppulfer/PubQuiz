@@ -46,6 +46,14 @@
                                     </div>
                                 }
                             }
+                            else if (_currentQuestion.Type == QuestionType.DinoRun)
+                            {
+                                <div class="alert alert-success fs-4">
+                                    You scored @(_lastAnswer.DinoScore ?? 0) points in the game!
+                                    <br/>
+                                    <strong>+@_lastAnswer.PointsAwarded points</strong>
+                                </div>
+                            }
                             else if (_lastAnswer.IsCorrect)
                             {
                                 <div class="alert alert-success fs-4">
@@ -94,6 +102,12 @@
                         {
                             <div class="alert alert-light border fs-5">
                                 The real image was: <strong>@((char)('A' + _currentQuestion.CorrectImageIndex))</strong>
+                            </div>
+                        }
+                        else if (_currentQuestion.Type == QuestionType.DinoRun)
+                        {
+                            <div class="alert alert-light border fs-5">
+                                Your best score: <strong>@(_lastAnswer?.DinoScore ?? 0)</strong>
                             </div>
                         }
 
@@ -145,7 +159,8 @@
                                     TimeRemaining="@_timeRemaining"
                                     HasAnswered="@_hasAnswered"
                                     SelectedOption="@_selectedOption"
-                                    OnAnswerSelected="SubmitMultipleChoiceAnswer" />
+                                    OnOptionSelected="SelectMultipleChoiceOption"
+                                    OnAnswerSubmitted="SubmitMultipleChoiceAnswer" />
                                 break;
 
                             case QuestionType.OpenEnded:
@@ -189,6 +204,15 @@
                                     SelectedIndex="@_selectedImageIndex"
                                     OnAnswerSubmitted="SubmitRealOrFakeAnswer" />
                                 break;
+
+                            case QuestionType.DinoRun:
+                                <DinoRunQuestion
+                                    Question="@_currentQuestion"
+                                    TimeRemaining="@_timeRemaining"
+                                    HasSubmitted="@_hasAnswered"
+                                    SubmittedScore="@_dinoScore"
+                                    OnScoreSubmitted="SubmitDinoScore" />
+                                break;
                         }
                     </div>
                 </div>
@@ -223,6 +247,7 @@
     private decimal _estimateValue;
     private decimal _estimateDeviation;
     private int _selectedImageIndex = -1;
+    private int _dinoScore;
 
     protected override async Task OnInitializedAsync()
     {
@@ -349,15 +374,21 @@
         QuestionType.Wordle => "Wordle",
         QuestionType.Estimate => "Estimate",
         QuestionType.RealOrFake => "Real or Fake",
+        QuestionType.DinoRun => "Dino Run",
         _ => "Question"
     };
+
+    private void SelectMultipleChoiceOption(int optionIndex)
+    {
+        if (_hasAnswered || _currentQuestion == null || _timeRemaining <= 0) return;
+        _selectedOption = optionIndex;
+    }
 
     private async Task SubmitMultipleChoiceAnswer(int optionIndex)
     {
         if (_hasAnswered || _currentQuestion == null) return;
 
         _hasAnswered = true;
-        _selectedOption = optionIndex;
 
         _lastAnswer = await GameService.SubmitAnswerAsync(_game!.Id, TeamId, _currentQuestionIndex, optionIndex, _currentQuestion);
 
@@ -442,6 +473,19 @@
         if (_hubConnection != null)
         {
             await _hubConnection.SendAsync("NotifyAnswerSubmitted", GameCode, TeamId);
+        }
+    }
+
+    private async Task SubmitDinoScore(int score)
+    {
+        if (_currentQuestion == null) return;
+
+        _dinoScore = score;
+        _lastAnswer = await GameService.SubmitDinoScoreAsync(_game!.Id, TeamId, _currentQuestionIndex, score);
+
+        if (_hubConnection != null)
+        {
+            await _hubConnection.SendAsync("NotifyDinoScore", GameCode, TeamId, score);
         }
     }
 

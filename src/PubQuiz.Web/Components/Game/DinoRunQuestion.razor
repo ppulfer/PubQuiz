@@ -1,0 +1,473 @@
+@using PubQuiz.Web.Models
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<h3 class="mb-4">@Question.Text</h3>
+
+<div class="text-center mb-3">
+    <span class="badge bg-warning text-dark fs-4 me-3">Time: @TimeRemaining s</span>
+    <span class="badge bg-primary fs-4">Score: @_currentScore</span>
+    @if (_bestScore > 0)
+    {
+        <span class="badge bg-success fs-4 ms-3">Best: @_bestScore</span>
+    }
+</div>
+
+<div class="card mb-3 border-0">
+    <div class="card-body p-0">
+        <canvas id="turtleCanvas" width="1200" height="400" style="width: 100%; display: block; background: linear-gradient(to bottom, #87CEEB 0%, #87CEEB 70%, #90EE90 70%, #228B22 100%);"></canvas>
+    </div>
+</div>
+
+@if (HasSubmitted)
+{
+    <div class="alert alert-info text-center">
+        Your best score: <strong>@_bestScore</strong>
+        <br/>
+        <small class="text-muted">Waiting for results...</small>
+    </div>
+}
+else if (TimeRemaining <= 0)
+{
+    <div class="alert alert-warning text-center">
+        Time's up! Your best score: <strong>@_bestScore</strong>
+    </div>
+}
+else
+{
+    <div class="text-center">
+        <p class="text-muted mb-2">Press <kbd>Space</kbd> or <kbd>↑</kbd> to jump, or tap the screen</p>
+        <p class="text-muted">Help the turtle jump over the boxes!</p>
+    </div>
+}
+
+<script suppress-error="BL9992">
+    window.turtleGame = {
+        canvas: null,
+        ctx: null,
+        turtle: null,
+        obstacles: [],
+        gameLoop: null,
+        isRunning: false,
+        score: 0,
+        speed: 5,
+        gravity: 0.8,
+        jumpForce: -16,
+        groundY: 320,
+        dotNetRef: null,
+        frame: 0,
+
+        init: function(dotNetRef) {
+            this.dotNetRef = dotNetRef;
+            this.canvas = document.getElementById('turtleCanvas');
+            if (!this.canvas) return;
+            this.ctx = this.canvas.getContext('2d');
+
+            this.turtle = {
+                x: 120,
+                y: this.groundY,
+                width: 70,
+                height: 50,
+                vy: 0,
+                jumping: false
+            };
+
+            this.obstacles = [];
+            this.score = 0;
+            this.speed = 5;
+            this.frame = 0;
+            this.isRunning = true;
+
+            document.addEventListener('keydown', this.handleKeyDown.bind(this));
+            this.canvas.addEventListener('touchstart', this.handleTouch.bind(this));
+
+            this.gameLoop = requestAnimationFrame(this.update.bind(this));
+        },
+
+        handleKeyDown: function(e) {
+            if ((e.code === 'Space' || e.code === 'ArrowUp') && !this.turtle.jumping && this.isRunning) {
+                e.preventDefault();
+                this.turtle.vy = this.jumpForce;
+                this.turtle.jumping = true;
+            }
+        },
+
+        handleTouch: function(e) {
+            e.preventDefault();
+            if (!this.turtle.jumping && this.isRunning) {
+                this.turtle.vy = this.jumpForce;
+                this.turtle.jumping = true;
+            }
+        },
+
+        drawTurtle: function(x, y, isJumping) {
+            const ctx = this.ctx;
+            const s = 1.4; // scale factor
+            const legOffset = isJumping ? 0 : Math.sin(this.frame * 0.3) * 4;
+
+            // Shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.2)';
+            ctx.beginPath();
+            ctx.ellipse(x + 35, this.groundY + 50, 28, 7, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Back legs
+            ctx.fillStyle = '#2E8B57';
+            ctx.beginPath();
+            ctx.ellipse(x + 14*s, y + 42 + legOffset, 8, 5, -0.3, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(x + 56, y + 42 - legOffset, 8, 5, 0.3, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Shell (main body)
+            ctx.fillStyle = '#8B4513';
+            ctx.beginPath();
+            ctx.ellipse(x + 35, y + 21, 31, 25, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Shell pattern
+            ctx.fillStyle = '#654321';
+            ctx.beginPath();
+            ctx.ellipse(x + 35, y + 17, 20, 14, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#8B4513';
+            ctx.beginPath();
+            ctx.ellipse(x + 35, y + 17, 14, 10, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Shell highlight
+            ctx.fillStyle = '#A0522D';
+            ctx.beginPath();
+            ctx.ellipse(x + 28, y + 11, 8, 6, -0.5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Head
+            ctx.fillStyle = '#2E8B57';
+            ctx.beginPath();
+            ctx.ellipse(x + 67, y + 25, 14, 11, 0.2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Eye
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(x + 73, y + 21, 6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(x + 74, y + 21, 3, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Smile
+            ctx.strokeStyle = '#1a5c3a';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(x + 73, y + 28, 4, 0, Math.PI);
+            ctx.stroke();
+
+            // Front legs
+            ctx.fillStyle = '#2E8B57';
+            ctx.beginPath();
+            ctx.ellipse(x + 11, y + 39 - legOffset, 7, 5, -0.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(x + 59, y + 39 + legOffset, 7, 5, 0.5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Tail
+            ctx.beginPath();
+            ctx.moveTo(x + 4, y + 28);
+            ctx.quadraticCurveTo(x - 7, y + 31, x - 4, y + 39);
+            ctx.lineWidth = 5;
+            ctx.strokeStyle = '#2E8B57';
+            ctx.stroke();
+        },
+
+        drawBox: function(x, y, width, height) {
+            const ctx = this.ctx;
+
+            // Main box body (cardboard brown)
+            ctx.fillStyle = '#C4A35A';
+            ctx.fillRect(x, y, width, height);
+
+            // Darker side shadow
+            ctx.fillStyle = '#A68B4B';
+            ctx.fillRect(x + width - 5, y, 5, height);
+
+            // Top flap shadow
+            ctx.fillStyle = '#B3944F';
+            ctx.fillRect(x, y, width, 6);
+
+            // Box tape (horizontal)
+            ctx.fillStyle = '#8B7355';
+            ctx.fillRect(x + width * 0.35, y, width * 0.3, height);
+
+            // Tape highlight
+            ctx.fillStyle = '#A08060';
+            ctx.fillRect(x + width * 0.38, y, width * 0.24, height);
+
+            // Box outline
+            ctx.strokeStyle = '#7A6840';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x, y, width, height);
+
+            // Tape seam line at top
+            ctx.beginPath();
+            ctx.moveTo(x + width * 0.5, y);
+            ctx.lineTo(x + width * 0.5, y + 10);
+            ctx.strokeStyle = '#6B5B3D';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        },
+
+        drawBird: function(x, y, frame) {
+            const ctx = this.ctx;
+            const wingUp = Math.sin(frame * 0.4) > 0;
+
+            ctx.fillStyle = '#4a4a4a';
+            // Body
+            ctx.beginPath();
+            ctx.ellipse(x + 20, y + 14, 20, 11, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Wing
+            ctx.beginPath();
+            if (wingUp) {
+                ctx.moveTo(x + 13, y + 11);
+                ctx.quadraticCurveTo(x + 20, y - 11, x + 33, y + 7);
+            } else {
+                ctx.moveTo(x + 13, y + 16);
+                ctx.quadraticCurveTo(x + 20, y + 30, x + 33, y + 20);
+            }
+            ctx.lineTo(x + 20, y + 14);
+            ctx.fill();
+
+            // Beak
+            ctx.fillStyle = '#FFA500';
+            ctx.beginPath();
+            ctx.moveTo(x + 37, y + 14);
+            ctx.lineTo(x + 47, y + 16);
+            ctx.lineTo(x + 37, y + 18);
+            ctx.closePath();
+            ctx.fill();
+
+            // Eye
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(x + 32, y + 11, 4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(x + 33, y + 11, 2, 0, Math.PI * 2);
+            ctx.fill();
+        },
+
+        update: function() {
+            if (!this.isRunning) return;
+            this.frame++;
+
+            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+            // Draw sky gradient
+            let gradient = this.ctx.createLinearGradient(0, 0, 0, this.groundY + 40);
+            gradient.addColorStop(0, '#87CEEB');
+            gradient.addColorStop(0.85, '#87CEEB');
+            gradient.addColorStop(0.85, '#90EE90');
+            gradient.addColorStop(1, '#228B22');
+            this.ctx.fillStyle = gradient;
+            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+            // Draw some clouds
+            this.ctx.fillStyle = 'rgba(255,255,255,0.8)';
+            this.drawCloud(150 - (this.frame * 0.5) % 1400, 50);
+            this.drawCloud(600 - (this.frame * 0.3) % 1400, 90);
+            this.drawCloud(1000 - (this.frame * 0.4) % 1400, 40);
+            this.drawCloud(350 - (this.frame * 0.35) % 1400, 120);
+
+            // Update turtle
+            this.turtle.vy += this.gravity;
+            this.turtle.y += this.turtle.vy;
+
+            if (this.turtle.y >= this.groundY) {
+                this.turtle.y = this.groundY;
+                this.turtle.vy = 0;
+                this.turtle.jumping = false;
+            }
+
+            // Draw turtle
+            this.drawTurtle(this.turtle.x, this.turtle.y, this.turtle.jumping);
+
+            // Spawn obstacles
+            if (this.obstacles.length === 0 || this.obstacles[this.obstacles.length - 1].x < this.canvas.width - 300 - Math.random() * 200) {
+                let isFlying = Math.random() > 0.8;
+                let boxHeight = 35 + Math.random() * 25;
+                this.obstacles.push({
+                    x: this.canvas.width,
+                    y: isFlying ? this.groundY - 30 : this.groundY + 50 - boxHeight,
+                    width: isFlying ? 40 : 35 + Math.random() * 20,
+                    height: isFlying ? 25 : boxHeight,
+                    isFlying: isFlying
+                });
+            }
+
+            // Update and draw obstacles
+            for (let i = this.obstacles.length - 1; i >= 0; i--) {
+                this.obstacles[i].x -= this.speed;
+
+                if (this.obstacles[i].isFlying) {
+                    this.drawBird(this.obstacles[i].x, this.obstacles[i].y, this.frame);
+                } else {
+                    this.drawBox(this.obstacles[i].x, this.obstacles[i].y, this.obstacles[i].width, this.obstacles[i].height);
+                }
+
+                // Remove off-screen
+                if (this.obstacles[i].x + this.obstacles[i].width < 0) {
+                    this.obstacles.splice(i, 1);
+                    continue;
+                }
+
+                // Collision detection
+                let turtleRect = {
+                    x: this.turtle.x + 12,
+                    y: this.turtle.y + 8,
+                    width: this.turtle.width - 24,
+                    height: this.turtle.height - 8
+                };
+                let obsRect = this.obstacles[i];
+
+                if (turtleRect.x < obsRect.x + obsRect.width &&
+                    turtleRect.x + turtleRect.width > obsRect.x &&
+                    turtleRect.y < obsRect.y + obsRect.height &&
+                    turtleRect.y + turtleRect.height > obsRect.y) {
+                    this.gameOver();
+                    return;
+                }
+            }
+
+            // Update score
+            this.score++;
+            this.speed = 5 + Math.floor(this.score / 400) * 0.5;
+
+            // Draw score
+            this.ctx.fillStyle = '#333';
+            this.ctx.font = 'bold 28px sans-serif';
+            this.ctx.fillText('Score: ' + this.score, this.canvas.width - 180, 45);
+
+            this.gameLoop = requestAnimationFrame(this.update.bind(this));
+        },
+
+        drawCloud: function(x, y) {
+            const ctx = this.ctx;
+            ctx.beginPath();
+            ctx.arc(x, y, 22, 0, Math.PI * 2);
+            ctx.arc(x + 30, y - 8, 28, 0, Math.PI * 2);
+            ctx.arc(x + 60, y, 22, 0, Math.PI * 2);
+            ctx.arc(x + 30, y + 8, 18, 0, Math.PI * 2);
+            ctx.fill();
+        },
+
+        gameOver: function() {
+            this.isRunning = false;
+
+            this.ctx.fillStyle = 'rgba(0,0,0,0.6)';
+            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            this.ctx.fillStyle = '#fff';
+            this.ctx.font = 'bold 42px sans-serif';
+            this.ctx.textAlign = 'center';
+            this.ctx.fillText('Game Over!', this.canvas.width / 2, 140);
+            this.ctx.font = '32px sans-serif';
+            this.ctx.fillText('Score: ' + this.score, this.canvas.width / 2, 190);
+            this.ctx.font = '24px sans-serif';
+            this.ctx.fillStyle = '#ccc';
+            this.ctx.fillText('Press Space or tap to restart', this.canvas.width / 2, 250);
+            this.ctx.textAlign = 'left';
+
+            if (this.dotNetRef) {
+                this.dotNetRef.invokeMethodAsync('OnGameOver', this.score);
+            }
+
+            // Allow restart
+            let restartHandler = (e) => {
+                if (e.code === 'Space' || e.type === 'touchstart') {
+                    e.preventDefault();
+                    document.removeEventListener('keydown', restartHandler);
+                    this.canvas.removeEventListener('touchstart', restartHandler);
+                    this.restart();
+                }
+            };
+            document.addEventListener('keydown', restartHandler);
+            this.canvas.addEventListener('touchstart', restartHandler);
+        },
+
+        restart: function() {
+            this.turtle.y = this.groundY;
+            this.turtle.vy = 0;
+            this.turtle.jumping = false;
+            this.obstacles = [];
+            this.score = 0;
+            this.speed = 5;
+            this.frame = 0;
+            this.isRunning = true;
+            this.gameLoop = requestAnimationFrame(this.update.bind(this));
+        },
+
+        stop: function() {
+            this.isRunning = false;
+            if (this.gameLoop) {
+                cancelAnimationFrame(this.gameLoop);
+            }
+        },
+
+        getScore: function() {
+            return this.score;
+        }
+    };
+</script>
+
+@code {
+    [Parameter, EditorRequired] public Question Question { get; set; } = null!;
+    [Parameter] public int TimeRemaining { get; set; }
+    [Parameter] public bool HasSubmitted { get; set; }
+    [Parameter] public int SubmittedScore { get; set; }
+    [Parameter] public EventCallback<int> OnScoreSubmitted { get; set; }
+
+    private int _currentScore;
+    private int _bestScore;
+    private DotNetObjectReference<DinoRunQuestion>? _dotNetRef;
+    private bool _initialized;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !HasSubmitted && TimeRemaining > 0)
+        {
+            _dotNetRef = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("turtleGame.init", _dotNetRef);
+            _initialized = true;
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnGameOver(int score)
+    {
+        _currentScore = score;
+        if (score > _bestScore)
+        {
+            _bestScore = score;
+            await OnScoreSubmitted.InvokeAsync(_bestScore);
+        }
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_initialized)
+        {
+            try
+            {
+                await JS.InvokeVoidAsync("turtleGame.stop");
+            }
+            catch { }
+        }
+        _dotNetRef?.Dispose();
+    }
+}
