@@ -50,6 +50,9 @@
     [SupplyParameterFromQuery]
     public string? Code { get; set; }
 
+    [SupplyParameterFromQuery]
+    public int? PredefinedTeams { get; set; }
+
     private Game? _game;
     private string _password = string.Empty;
     private string _baseUrl = string.Empty;
@@ -65,6 +68,6 @@
             return;
         }
 
-        _game = await GameService.CreateGameAsync(_password, Code);
+        _game = await GameService.CreateGameAsync(_password, Code, PredefinedTeams);
     }
 }

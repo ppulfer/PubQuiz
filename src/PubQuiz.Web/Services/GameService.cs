@@ -8,7 +8,7 @@ public class GameService(PubQuizDbContext context, ScoringService scoringService
 {
     private static readonly Random Random = new();
 
-    public async Task<Game> CreateGameAsync(string hostPassword, string? customCode = null)
+    public async Task<Game> CreateGameAsync(string hostPassword, string? customCode = null, int? predefinedTeamCount = null)
     {
         var code = string.IsNullOrWhiteSpace(customCode) ? GenerateGameCode() : customCode.ToUpper().Trim();
 
@@ -17,10 +17,28 @@ public class GameService(PubQuizDbContext context, ScoringService scoringService
             Id = Guid.NewGuid(),
             Code = code,
             HostPasswordHash = BCrypt.Net.BCrypt.HashPassword(hostPassword),
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = DateTime.UtcNow,
+            UsePredefinedTeams = predefinedTeamCount.HasValue && predefinedTeamCount.Value > 0,
+            PredefinedTeamCount = predefinedTeamCount ?? 0
         };
 
         context.Games.Add(game);
+
+        if (game.UsePredefinedTeams)
+        {
+            for (int i = 1; i <= game.PredefinedTeamCount; i++)
+            {
+                var team = new Team
+                {
+                    Id = Guid.NewGuid(),
+                    GameId = game.Id,
+                    Name = $"Table-{i}",
+                    JoinedAt = DateTime.UtcNow
+                };
+                context.Teams.Add(team);
+            }
+        }
+
         await context.SaveChangesAsync();
         return game;
     }
@@ -50,11 +68,20 @@ public class GameService(PubQuizDbContext context, ScoringService scoringService
 
     public async Task<Team> JoinGameAsync(Guid gameId, string teamName)
     {
+        var normalizedName = teamName.Trim().ToLowerInvariant();
+        var existingTeam = await context.Teams
+            .FirstOrDefaultAsync(t => t.GameId == gameId && t.Name.ToLower() == normalizedName);
+
+        if (existingTeam != null)
+        {
+            return existingTeam;
+        }
+
         var team = new Team
         {
             Id = Guid.NewGuid(),
             GameId = gameId,
-            Name = teamName,
+            Name = teamName.Trim(),
             JoinedAt = DateTime.UtcNow
         };
 

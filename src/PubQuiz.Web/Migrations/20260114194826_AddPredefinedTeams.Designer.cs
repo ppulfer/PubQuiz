@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using PubQuiz.Web.Data;
@@ -11,9 +12,11 @@ using PubQuiz.Web.Data;
 namespace PubQuiz.Web.Migrations
 {
     [DbContext(typeof(PubQuizDbContext))]
-    partial class PubQuizDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260114194826_AddPredefinedTeams")]
+    partial class AddPredefinedTeams
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

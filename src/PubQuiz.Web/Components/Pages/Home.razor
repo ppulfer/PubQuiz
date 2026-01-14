@@ -1,4 +1,5 @@
 @page "/"
+@using PubQuiz.Web.Models
 @inject GameService GameService
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
@@ -31,7 +32,7 @@
                     <div class="alert alert-warning mt-3 mb-0">@_reconnectError</div>
                 }
             }
-            else
+            else if (_gameToJoin == null)
             {
                 <h2 class="mb-4">Join Game</h2>
 
@@ -40,38 +41,72 @@
                     <div class="alert alert-danger">@_errorMessage</div>
                 }
 
-                <EditForm Model="@_model" OnValidSubmit="JoinGame" FormName="JoinGameForm">
-                    <DataAnnotationsValidator />
+                <div class="mb-3 text-start">
+                    <label class="form-label">Game Code</label>
+                    <input type="text" class="form-control form-control-lg text-center text-uppercase"
+                           @bind="_gameCode" maxlength="10" placeholder="ABCDE" />
+                </div>
 
-                    <div class="mb-3 text-start">
-                        <label class="form-label">Game Code</label>
-                        <InputText @bind-Value="_model.GameCode" class="form-control form-control-lg text-center text-uppercase"
-                                   maxlength="10" placeholder="ABCDE" />
-                        <ValidationMessage For="@(() => _model.GameCode)" />
+                <button class="btn btn-primary btn-lg w-100" @onclick="LookupGame" disabled="@_isJoining">
+                    @if (_isJoining)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                    }
+                    Continue
+                </button>
+            }
+            else
+            {
+                <h2 class="mb-4">Join Game</h2>
+                <p class="text-muted mb-3">Game: <strong>@_gameToJoin.Code</strong></p>
+
+                @if (!string.IsNullOrEmpty(_errorMessage))
+                {
+                    <div class="alert alert-danger">@_errorMessage</div>
+                }
+
+                @if (_gameToJoin.UsePredefinedTeams)
+                {
+                    <div class="mb-4 text-start">
+                        <label class="form-label">Select your Table</label>
+                        <select class="form-select form-select-lg" @bind="_selectedTeamId">
+                            <option value="">-- Select Table --</option>
+                            @foreach (var team in _gameToJoin.Teams.OrderBy(t => t.Name))
+                            {
+                                <option value="@team.Id">@team.Name</option>
+                            }
+                        </select>
                     </div>
-
+                }
+                else
+                {
                     <div class="mb-4 text-start">
                         <label class="form-label">Team Name</label>
-                        <InputText @bind-Value="_model.TeamName" class="form-control form-control-lg"
-                                   maxlength="50" placeholder="Your Team Name" />
-                        <ValidationMessage For="@(() => _model.TeamName)" />
+                        <input type="text" class="form-control form-control-lg" @bind="_teamName"
+                               maxlength="50" placeholder="Your Team Name" />
                     </div>
+                }
 
-                    <button type="submit" class="btn btn-primary btn-lg w-100" disabled="@_isJoining">
-                        @if (_isJoining)
-                        {
-                            <span class="spinner-border spinner-border-sm me-2"></span>
-                        }
-                        Join Game
-                    </button>
-                </EditForm>
+                <button class="btn btn-primary btn-lg w-100 mb-2" @onclick="JoinGame" disabled="@_isJoining">
+                    @if (_isJoining)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                    }
+                    Join Game
+                </button>
+                <button class="btn btn-outline-secondary btn-sm" @onclick="() => _gameToJoin = null">
+                    Back
+                </button>
             }
         </div>
     </div>
 </div>
 
 @code {
-    private JoinGameModel _model = new();
+    private string _gameCode = "";
+    private string _teamName = "";
+    private Guid? _selectedTeamId;
+    private PubQuiz.Web.Models.Game? _gameToJoin;
     private string? _errorMessage;
     private string? _reconnectError;
     private bool _isJoining;
@@ -164,14 +199,20 @@
         }
     }
 
-    private async Task JoinGame()
+    private async Task LookupGame()
     {
         _errorMessage = null;
         _isJoining = true;
 
         try
         {
-            var game = await GameService.GetGameByCodeAsync(_model.GameCode);
+            if (string.IsNullOrWhiteSpace(_gameCode))
+            {
+                _errorMessage = "Please enter a game code.";
+                return;
+            }
+
+            var game = await GameService.GetGameByCodeAsync(_gameCode);
             if (game == null)
             {
                 _errorMessage = "Game not found. Please check the code and try again.";
@@ -184,9 +225,9 @@
                 return;
             }
 
-            var team = await GameService.JoinGameAsync(game.Id, _model.TeamName);
-            await SaveSession(game.Code, team.Id, team.Name);
-            Navigation.NavigateTo($"/game/lobby/{game.Code}/{team.Id}");
+            _gameToJoin = game;
+            _selectedTeamId = null;
+            _teamName = "";
         }
         finally
         {
@@ -194,15 +235,47 @@
         }
     }
 
-    private class JoinGameModel
+    private async Task JoinGame()
     {
-        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Game code is required")]
-        [System.ComponentModel.DataAnnotations.StringLength(10, MinimumLength = 1, ErrorMessage = "Game code must be 1-10 characters")]
-        public string GameCode { get; set; } = string.Empty;
+        _errorMessage = null;
+        _isJoining = true;
 
-        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Team name is required")]
-        [System.ComponentModel.DataAnnotations.StringLength(50, MinimumLength = 1, ErrorMessage = "Team name must be 1-50 characters")]
-        public string TeamName { get; set; } = string.Empty;
+        try
+        {
+            if (_gameToJoin == null) return;
+
+            Team? team;
+            if (_gameToJoin.UsePredefinedTeams)
+            {
+                if (!_selectedTeamId.HasValue)
+                {
+                    _errorMessage = "Please select a table.";
+                    return;
+                }
+                team = _gameToJoin.Teams.FirstOrDefault(t => t.Id == _selectedTeamId.Value);
+                if (team == null)
+                {
+                    _errorMessage = "Invalid table selected.";
+                    return;
+                }
+            }
+            else
+            {
+                if (string.IsNullOrWhiteSpace(_teamName))
+                {
+                    _errorMessage = "Please enter a team name.";
+                    return;
+                }
+                team = await GameService.JoinGameAsync(_gameToJoin.Id, _teamName);
+            }
+
+            await SaveSession(_gameToJoin.Code, team.Id, team.Name);
+            Navigation.NavigateTo($"/game/lobby/{_gameToJoin.Code}/{team.Id}");
+        }
+        finally
+        {
+            _isJoining = false;
+        }
     }
 
     private class TeamSession

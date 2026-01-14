@@ -1,0 +1,98 @@
+@page "/join"
+@using PubQuiz.Web.Models
+@inject GameService GameService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+<PageTitle>Joining Game - Pause-Quiz</PageTitle>
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow mt-5">
+                <div class="card-body p-4 text-center">
+                    @if (!string.IsNullOrEmpty(_errorMessage))
+                    {
+                        <div class="alert alert-danger">@_errorMessage</div>
+                        <a href="/" class="btn btn-primary">Go to Home</a>
+                    }
+                    else
+                    {
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <p class="mt-3">Joining game...</p>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery]
+    public string? Code { get; set; }
+
+    [SupplyParameterFromQuery]
+    public string? Team { get; set; }
+
+    private string? _errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Code))
+        {
+            _errorMessage = "Missing game code.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(Team))
+        {
+            _errorMessage = "Missing team name.";
+            return;
+        }
+
+        var game = await GameService.GetGameByCodeAsync(Code);
+        if (game == null)
+        {
+            _errorMessage = "Game not found.";
+            return;
+        }
+
+        if (game.Status == GameStatus.Finished)
+        {
+            _errorMessage = "This game has already ended.";
+            return;
+        }
+
+        Team? team;
+        if (game.UsePredefinedTeams)
+        {
+            team = game.Teams.FirstOrDefault(t => t.Name.Equals(Team, StringComparison.OrdinalIgnoreCase));
+            if (team == null)
+            {
+                _errorMessage = $"Team '{Team}' not found in this game.";
+                return;
+            }
+        }
+        else
+        {
+            team = await GameService.JoinGameAsync(game.Id, Team);
+        }
+
+        await SaveSession(game.Code, team.Id, team.Name);
+
+        var targetPage = game.Status == GameStatus.Waiting ? "lobby" : "play";
+        Navigation.NavigateTo($"/game/{targetPage}/{game.Code}/{team.Id}");
+    }
+
+    private async Task SaveSession(string gameCode, Guid teamId, string teamName)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("localStorage.setItem", "pubquiz_gameCode", gameCode);
+            await JS.InvokeVoidAsync("localStorage.setItem", "pubquiz_teamId", teamId.ToString());
+            await JS.InvokeVoidAsync("localStorage.setItem", "pubquiz_teamName", teamName);
+        }
+        catch { }
+    }
+}

@@ -489,35 +489,31 @@ else
 
     private bool CanShowResults()
     {
-        if (_currentQuestion == null) return false;
-
-        return _currentQuestion.Type switch
-        {
-            QuestionType.MultipleChoice => _timeRemaining <= 0 || _answeredTeams.Count == _game!.Teams.Count,
-            QuestionType.OpenEnded => _timeRemaining <= 0 || _answeredTeams.Count == _game!.Teams.Count,
-            QuestionType.Wordle => _wordleProgress.Count == _game!.Teams.Count && _wordleProgress.All(p => p.Solved || p.OutOfAttempts),
-            QuestionType.Estimate => _timeRemaining <= 0 || _answeredTeams.Count == _game!.Teams.Count,
-            QuestionType.RealOrFake => _timeRemaining <= 0 || _answeredTeams.Count == _game!.Teams.Count,
-            QuestionType.DinoRun => true,
-            _ => false
-        };
+        return _currentQuestion != null && _showingQuestion;
     }
 
     private string GetShowResultsHint()
     {
-        if (_currentQuestion == null) return "";
+        if (_currentQuestion == null || _game == null) return "";
 
-        return _currentQuestion.Type switch
+        var totalTeams = _game.Teams.Count;
+        if (totalTeams == 0) return "";
+
+        if (_currentQuestion.Type == QuestionType.Wordle)
         {
-            QuestionType.MultipleChoice when _answeredTeams.Count == _game!.Teams.Count && _timeRemaining > 0 => "(All answered)",
-            QuestionType.OpenEnded when _answeredTeams.Count == _game!.Teams.Count && _timeRemaining > 0 => "(All answered)",
-            QuestionType.Wordle => "(All finished)",
-            QuestionType.Estimate when _answeredTeams.Count == _game!.Teams.Count && _timeRemaining > 0 => "(All answered)",
-            QuestionType.RealOrFake when _answeredTeams.Count == _game!.Teams.Count && _timeRemaining > 0 => "(All answered)",
-            QuestionType.DinoRun when _timeRemaining <= 0 => "(Time's up)",
-            QuestionType.DinoRun when _timeRemaining > 0 => $"({_timeRemaining}s left)",
-            _ => ""
-        };
+            var finished = _wordleProgress.Count(p => p.Solved || p.OutOfAttempts);
+            return finished == totalTeams ? "(All finished)" : $"({finished}/{totalTeams})";
+        }
+
+        if (_currentQuestion.Type == QuestionType.DinoRun)
+        {
+            return _timeRemaining > 0 ? $"({_dinoProgress.Count}/{totalTeams} - {_timeRemaining}s)" : "(Time's up)";
+        }
+
+        var answered = _answeredTeams.Count;
+        if (answered == totalTeams) return "(All answered)";
+        if (_timeRemaining <= 0) return "(Time's up)";
+        return $"({answered}/{totalTeams})";
     }
 
     private async Task ShowQuestionResults()
