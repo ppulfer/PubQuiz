@@ -438,7 +438,7 @@ else
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender && !HasSubmitted && TimeRemaining > 0)
+        if (!_initialized && !HasSubmitted && TimeRemaining > 0)
         {
             _dotNetRef = DotNetObjectReference.Create(this);
             await JS.InvokeVoidAsync("turtleGame.init", _dotNetRef);

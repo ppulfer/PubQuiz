@@ -425,8 +425,22 @@ public class GameService(PubQuizDbContext context, ScoringService scoringService
     public async Task<Answer?> GetAnswerAsync(Guid gameId, Guid teamId, int questionIndex)
     {
         return await context.Answers
+            .AsNoTracking()
             .Include(a => a.WordleAttempts)
             .FirstOrDefaultAsync(a => a.GameId == gameId && a.TeamId == teamId && a.QuestionIndex == questionIndex);
+    }
+
+    public async Task<int> GetDinoRankAsync(Guid gameId, int questionIndex, int score)
+    {
+        var allScores = await context.Answers
+            .AsNoTracking()
+            .Where(a => a.GameId == gameId && a.QuestionIndex == questionIndex && a.DinoScore.HasValue)
+            .Select(a => a.DinoScore!.Value)
+            .Distinct()
+            .OrderByDescending(s => s)
+            .ToListAsync();
+
+        return allScores.IndexOf(score) + 1;
     }
 
     public async Task EndGameAsync(Guid gameId)
