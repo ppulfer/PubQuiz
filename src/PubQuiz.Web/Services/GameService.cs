@@ -68,6 +68,40 @@ public class GameService(PubQuizDbContext context, ScoringService scoringService
         return await context.Questions.OrderBy(q => q.SortOrder).ThenBy(q => q.Id).ToListAsync();
     }
 
+    public async Task<Question> AddQuestionAsync(Question question)
+    {
+        question.Id = Guid.NewGuid();
+        var maxOrder = await context.Questions.MaxAsync(q => (int?)q.SortOrder) ?? 0;
+        question.SortOrder = maxOrder + 1;
+        context.Questions.Add(question);
+        await context.SaveChangesAsync();
+        return question;
+    }
+
+    public async Task DeleteQuestionAsync(Guid questionId)
+    {
+        var question = await context.Questions.FirstOrDefaultAsync(q => q.Id == questionId);
+        if (question != null)
+        {
+            context.Questions.Remove(question);
+            await context.SaveChangesAsync();
+        }
+    }
+
+    public async Task MoveQuestionAsync(Guid questionId, bool moveUp)
+    {
+        var questions = await context.Questions.OrderBy(q => q.SortOrder).ToListAsync();
+        var index = questions.FindIndex(q => q.Id == questionId);
+        if (index < 0) return;
+
+        var swapIndex = moveUp ? index - 1 : index + 1;
+        if (swapIndex < 0 || swapIndex >= questions.Count) return;
+
+        (questions[index].SortOrder, questions[swapIndex].SortOrder) =
+            (questions[swapIndex].SortOrder, questions[index].SortOrder);
+        await context.SaveChangesAsync();
+    }
+
     public async Task StartQuestionAsync(Guid gameId, int questionIndex)
     {
         var game = await context.Games.FirstOrDefaultAsync(g => g.Id == gameId);

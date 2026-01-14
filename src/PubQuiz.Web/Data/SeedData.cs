@@ -41,7 +41,7 @@ public static class SeedData
             new()
             {
                 Id = Guid.NewGuid(),
-                SortOrder = 2,
+                SortOrder = 3,
                 Type = QuestionType.RealOrFake,
                 Text = "Which Hero is the real one?",
                 ImageUrls = ["/images/realorfake/inno_1.png", "/images/realorfake/inno_2.png", "/images/realorfake/inno_3.png", "/images/realorfake/inno_4.png"],
@@ -51,7 +51,7 @@ public static class SeedData
             new()
             {
                 Id = Guid.NewGuid(),
-                SortOrder = 3,
+                SortOrder = 4,
                 Type = QuestionType.RealOrFake,
                 Text = "Which Hero is the real one?",
                 ImageUrls = ["/images/realorfake/eigen_1.png", "/images/realorfake/eigen_2.png", "/images/realorfake/eigen_3.png", "/images/realorfake/eigen_4.png"],
@@ -61,7 +61,7 @@ public static class SeedData
             new()
             {
                 Id = Guid.NewGuid(),
-                SortOrder = 3,
+                SortOrder = 5,
                 Type = QuestionType.RealOrFake,
                 Text = "Which Hero is the real one?",
                 ImageUrls = ["/images/realorfake/fire_4.png", "/images/realorfake/fire_2.png", "/images/realorfake/fire_3.png", "/images/realorfake/fire_1.png"],
@@ -71,7 +71,7 @@ public static class SeedData
             new()
             {
                 Id = Guid.NewGuid(),
-                SortOrder = 3,
+                SortOrder = 6,
                 Type = QuestionType.RealOrFake,
                 Text = "Which Hero is the real one?",
                 ImageUrls = ["/images/realorfake/pirat_1.png", "/images/realorfake/pirat_2.png", "/images/realorfake/pirat_3.png", "/images/realorfake/pirat_4.png"],
@@ -81,7 +81,7 @@ public static class SeedData
             new()
             {
                 Id = Guid.NewGuid(),
-                SortOrder = 3,
+                SortOrder = 7,
                 Type = QuestionType.RealOrFake,
                 Text = "Which Hero is the real one?",
                 ImageUrls = ["/images/realorfake/koop_1.png", "/images/realorfake/koop_2.png", "/images/realorfake/koop_3.png", "/images/realorfake/koop_4.png"],
@@ -91,7 +91,7 @@ public static class SeedData
             new()
             {
                 Id = Guid.NewGuid(),
-                SortOrder = 4,
+                SortOrder = 8,
                 Type = QuestionType.Wordle,
                 Text = "Guess a word related to Digitec Galaxus",
                 CorrectAnswer = "MIGORS",
@@ -101,7 +101,7 @@ public static class SeedData
             new()
             {
                 Id = Guid.NewGuid(),
-                SortOrder = 5,
+                SortOrder = 9,
                 Type = QuestionType.Wordle,
                 Text = "Guess a word - it's related to Programming",
                 CorrectAnswer = "MEMORY",
@@ -111,10 +111,10 @@ public static class SeedData
             new()
             {
                 Id = Guid.NewGuid(),
-                SortOrder = 6,
+                SortOrder = 10,
                 Type = QuestionType.DinoRun,
                 Text = "Turtle Run - Get the highest score!",
-                TimeLimitSeconds = 20
+                TimeLimitSeconds = 300
             },
         };
 
