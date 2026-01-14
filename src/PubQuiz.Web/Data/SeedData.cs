@@ -43,7 +43,7 @@ public static class SeedData
                 Id = Guid.NewGuid(),
                 SortOrder = 3,
                 Type = QuestionType.RealOrFake,
-                Text = "Which Hero is the real one?",
+                Text = "Which Hero stands for Innovativ?",
                 ImageUrls = ["/images/realorfake/inno_1.png", "/images/realorfake/inno_2.png", "/images/realorfake/inno_3.png", "/images/realorfake/inno_4.png"],
                 CorrectImageIndex = 1,
                 TimeLimitSeconds = 120
@@ -53,7 +53,7 @@ public static class SeedData
                 Id = Guid.NewGuid(),
                 SortOrder = 4,
                 Type = QuestionType.RealOrFake,
-                Text = "Which Hero is the real one?",
+                Text = "Which Hero stands for Eigenverantworlich?",
                 ImageUrls = ["/images/realorfake/eigen_1.png", "/images/realorfake/eigen_2.png", "/images/realorfake/eigen_3.png", "/images/realorfake/eigen_4.png"],
                 CorrectImageIndex = 0,
                 TimeLimitSeconds = 60
@@ -63,7 +63,7 @@ public static class SeedData
                 Id = Guid.NewGuid(),
                 SortOrder = 5,
                 Type = QuestionType.RealOrFake,
-                Text = "Which Hero is the real one?",
+                Text = "Which Hero stands for Ambitioniert?",
                 ImageUrls = ["/images/realorfake/fire_4.png", "/images/realorfake/fire_2.png", "/images/realorfake/fire_3.png", "/images/realorfake/fire_1.png"],
                 CorrectImageIndex = 1,
                 TimeLimitSeconds = 60
@@ -73,7 +73,7 @@ public static class SeedData
                 Id = Guid.NewGuid(),
                 SortOrder = 6,
                 Type = QuestionType.RealOrFake,
-                Text = "Which Hero is the real one?",
+                Text = "Which Hero stands for Piratisch?",
                 ImageUrls = ["/images/realorfake/pirat_1.png", "/images/realorfake/pirat_2.png", "/images/realorfake/pirat_3.png", "/images/realorfake/pirat_4.png"],
                 CorrectImageIndex = 0,
                 TimeLimitSeconds = 60
@@ -83,7 +83,7 @@ public static class SeedData
                 Id = Guid.NewGuid(),
                 SortOrder = 7,
                 Type = QuestionType.RealOrFake,
-                Text = "Which Hero is the real one?",
+                Text = "Which Hero stands for Kooperativ?",
                 ImageUrls = ["/images/realorfake/koop_1.png", "/images/realorfake/koop_2.png", "/images/realorfake/koop_3.png", "/images/realorfake/koop_4.png"],
                 CorrectImageIndex = 0,
                 TimeLimitSeconds = 60
@@ -93,7 +93,7 @@ public static class SeedData
                 Id = Guid.NewGuid(),
                 SortOrder = 8,
                 Type = QuestionType.Wordle,
-                Text = "Guess a word related to Digitec Galaxus",
+                Text = "Guess a word related to DG?",
                 CorrectAnswer = "MIGORS",
                 MaxAttempts = 6,
                 TimeLimitSeconds = 300
