@@ -65,7 +65,7 @@ public static class SeedData
                 Type = QuestionType.RealOrFake,
                 Text = "Which Hero is the real one?",
                 ImageUrls = ["/images/realorfake/fire_4.png", "/images/realorfake/fire_2.png", "/images/realorfake/fire_3.png", "/images/realorfake/fire_1.png"],
-                CorrectImageIndex = 3,
+                CorrectImageIndex = 1,
                 TimeLimitSeconds = 60
             },
             new()
