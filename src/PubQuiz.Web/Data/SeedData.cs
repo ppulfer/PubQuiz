@@ -31,16 +31,6 @@ public static class SeedData
             new()
             {
                 Id = Guid.NewGuid(),
-                SortOrder = 2,
-                Type = QuestionType.MultipleChoice,
-                Text = "How many employess according to Rebekka have we hired in 2025?",
-                Options = ["< 1000", "1000-1200", "1200-1400", "> 1600"],
-                CorrectOptionIndex = 3,
-                TimeLimitSeconds = 120
-            },
-            new()
-            {
-                Id = Guid.NewGuid(),
                 SortOrder = 3,
                 Type = QuestionType.RealOrFake,
                 Text = "Which Hero stands for Innovativ?",
